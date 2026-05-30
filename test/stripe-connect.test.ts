@@ -29,6 +29,18 @@ describe("stripe connect routes", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("serves Stripe Connect onboarding landing pages", async () => {
+    const app = buildApp({ env: testEnv(), ctx: createTestContext() });
+    const returnRes = await app.inject({ method: "GET", url: "/stripe/return" });
+    expect(returnRes.statusCode).toBe(200);
+    expect(returnRes.headers["content-type"]).toContain("text/html");
+    expect(returnRes.body).toContain("Stripe setup complete");
+
+    const refreshRes = await app.inject({ method: "GET", url: "/stripe/refresh" });
+    expect(refreshRes.statusCode).toBe(200);
+    expect(refreshRes.body).toContain("Continue Stripe setup");
+  });
+
   it("returns 503 for payment-status when stripe is not configured", async () => {
     const app = buildApp({ env: testEnv(), ctx: createTestContext() });
     const res = await app.inject({

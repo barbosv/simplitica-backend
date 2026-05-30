@@ -7,6 +7,7 @@ import type { AppContext } from "./db/context.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerSubscriptionRoutes } from "./routes/subscriptions.js";
 import { registerStripeConnectRoutes } from "./routes/stripe-connect.js";
+import { registerStripeConnectLandingRoutes } from "./routes/stripe-connect-landing.js";
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook.js";
 
 declare module "fastify" {
@@ -65,6 +66,7 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
   });
 
   void registerHealthRoutes(app, ctx);
+  registerStripeConnectLandingRoutes(app);
   void registerSubscriptionRoutes(app, env, ctx);
   void registerStripeWebhookRoutes(app, env, ctx);
 
