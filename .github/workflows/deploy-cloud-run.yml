@@ -119,12 +119,10 @@ jobs:
           RUN_URL=$(gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
             --region="${{ env.GCP_REGION }}" \
             --format='value(status.url)')
+          # Org policy may block allUsers; use the deploy service account identity token.
+          TOKEN=$(gcloud auth print-identity-token --audiences="${RUN_URL}")
+          curl -fsS -H "Authorization: Bearer ${TOKEN}" "${RUN_URL%/}/health"
+          echo "Deployed to ${RUN_URL} (authenticated /health OK)"
           if [ -n "${{ env.PUBLIC_API_URL }}" ]; then
-            if curl -fsS "${{ env.PUBLIC_API_URL }}/health"; then
-              echo "Deployed to ${{ env.PUBLIC_API_URL }}"
-              exit 0
-            fi
-            echo "Custom domain not ready yet; checking Cloud Run URL..."
+            echo "Custom domain ${{ env.PUBLIC_API_URL }} — configure DNS + domain mapping separately; public access may require org policy exception for Stripe webhooks."
           fi
-          curl -fsS "${RUN_URL%/}/health"
-          echo "Deployed to ${RUN_URL}"

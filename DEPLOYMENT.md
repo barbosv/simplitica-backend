@@ -184,6 +184,16 @@ gcloud run deploy simplitica-backend \
 
 Use `cloudbuild.yaml` for Cloud Build–triggered deploys (adjust substitutions).
 
+### Public access (org policy)
+
+CI uses `--allow-unauthenticated`, but some GCP organizations **block** `allUsers` on Cloud Run (`FAILED_PRECONDITION: ... organization policy`). Symptoms:
+
+- Deploy warning: *Setting IAM policy failed*
+- `gcloud run services add-iam-policy-binding ... allUsers` fails
+- Unauthenticated `curl` to the service returns **403**
+
+The GitHub smoke check uses an **authenticated** identity token instead. For **Stripe webhooks** and the **iOS app**, the API must be reachable without auth — ask your org admin to allow public Cloud Run invoker, or front the service with a load balancer / DNS setup that matches your policy.
+
 ## 4b. GitHub Actions (CI/CD)
 
 Pushes to `main` run tests, build a Docker image, push to Artifact Registry, and deploy to Cloud Run via [`.github/workflows/deploy-cloud-run.yml`](.github/workflows/deploy-cloud-run.yml). Pull requests run tests only.
