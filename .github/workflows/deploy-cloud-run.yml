@@ -45,6 +45,7 @@ jobs:
       GCP_ARTIFACT_REPO: ${{ vars.GCP_ARTIFACT_REPO || 'simplitica' }}
       GCP_CLOUD_SQL_INSTANCE: ${{ vars.GCP_CLOUD_SQL_INSTANCE }}
       GCP_RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      GCP_DEPLOY_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'simplitica-backend' }}
       PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
       STRIPE_MODE: ${{ vars.STRIPE_MODE || 'test' }}
@@ -114,15 +115,22 @@ jobs:
           fi
           gcloud run deploy "${DEPLOY_ARGS[@]}"
 
+      - name: Grant deploy SA invoker (org may block allUsers)
+        run: |
+          gcloud run services add-iam-policy-binding "${{ env.CLOUD_RUN_SERVICE }}" \
+            --region="${{ env.GCP_REGION }}" \
+            --member="serviceAccount:${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}" \
+            --role="roles/run.invoker" \
+            --quiet
+
       - name: Smoke check
         run: |
           RUN_URL=$(gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
             --region="${{ env.GCP_REGION }}" \
             --format='value(status.url)')
-          # Org policy may block allUsers; use the deploy service account identity token.
-          TOKEN=$(gcloud auth print-identity-token --audiences="${RUN_URL}")
+          TOKEN=$(gcloud auth print-identity-token --audiences="${RUN_URL%/}")
           curl -fsS -H "Authorization: Bearer ${TOKEN}" "${RUN_URL%/}/health"
           echo "Deployed to ${RUN_URL} (authenticated /health OK)"
           if [ -n "${{ env.PUBLIC_API_URL }}" ]; then
-            echo "Custom domain ${{ env.PUBLIC_API_URL }} — configure DNS + domain mapping separately; public access may require org policy exception for Stripe webhooks."
+            echo "Custom domain ${{ env.PUBLIC_API_URL }} — configure DNS + domain mapping; Stripe needs public invoker (org policy may block allUsers)."
           fi
