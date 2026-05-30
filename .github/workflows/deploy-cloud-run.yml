@@ -50,8 +50,8 @@ jobs:
       PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
       STRIPE_MODE: ${{ vars.STRIPE_MODE || 'test' }}
       APPLE_ENVIRONMENT: ${{ vars.APPLE_ENVIRONMENT || 'Production' }}
-      STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL || 'https://simplitica.co/stripe/return' }}
-      STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL || 'https://simplitica.co/stripe/refresh' }}
+      STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL || 'https://simpli-invoice.simplitica.co/stripe/return' }}
+      STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL || 'https://simpli-invoice.simplitica.co/stripe/refresh' }}
       STRIPE_PLATFORM_COUNTRY: ${{ vars.STRIPE_PLATFORM_COUNTRY || 'US' }}
       SIMPLI_INVOICE_BUNDLE_ID: ${{ vars.SIMPLI_INVOICE_BUNDLE_ID || 'co.simplitica.simpli-invoice' }}
       SIMPLI_INVOICE_APP_APPLE_ID: ${{ vars.SIMPLI_INVOICE_APP_APPLE_ID }}
