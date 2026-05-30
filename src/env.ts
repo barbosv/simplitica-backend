@@ -25,7 +25,12 @@ const BaseEnvSchema = z.object({
 export type Env = z.infer<typeof BaseEnvSchema>;
 
 export function readEnv(raw: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = BaseEnvSchema.parse(raw);
+  const normalized: NodeJS.ProcessEnv = { ...raw };
+  if (normalized.SIMPLI_INVOICE_APP_APPLE_ID === "") {
+    delete normalized.SIMPLI_INVOICE_APP_APPLE_ID;
+  }
+
+  const parsed = BaseEnvSchema.parse(normalized);
 
   if (parsed.NODE_ENV === "production") {
     if (parsed.STORAGE_BACKEND === "postgres" && !parsed.DATABASE_URL) {
