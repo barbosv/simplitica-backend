@@ -1,0 +1,59 @@
+# Reference Cloud Run service configuration (adjust project/region/secrets).
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: simplitica-backend
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cloudsql-instances: PROJECT:REGION:INSTANCE
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT/REPO/simplitica-backend:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "8080"
+            - name: STORAGE_BACKEND
+              value: postgres
+            - name: RUN_MIGRATIONS
+              value: "true"
+            - name: STRIPE_MODE
+              value: test
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: DATABASE_URL
+                  key: latest
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: STRIPE_SECRET_KEY
+                  key: latest
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: STRIPE_WEBHOOK_SECRET
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080

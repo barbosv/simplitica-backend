@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: simplitica
+      POSTGRES_PASSWORD: simplitica
+      POSTGRES_DB: simplitica
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simplitica"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "3000:8080"
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://simplitica:simplitica@postgres:5432/simplitica
+      RUN_MIGRATIONS: "true"
+      APPLE_ENVIRONMENT: Sandbox
+      STRIPE_MODE: test
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CONNECT_RETURN_URL: ${STRIPE_CONNECT_RETURN_URL:-https://example.com/stripe/return}
+      STRIPE_CONNECT_REFRESH_URL: ${STRIPE_CONNECT_REFRESH_URL:-https://example.com/stripe/refresh}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

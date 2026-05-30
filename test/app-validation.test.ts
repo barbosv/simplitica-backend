@@ -1,17 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.js";
-
-const testEnv = {
-  PORT: 0,
-  NODE_ENV: "test" as const,
-  APPLE_ENVIRONMENT: "Sandbox" as const,
-  SIMPLI_INVOICE_BUNDLE_ID: "co.simplitica.simpli-invoice",
-  SIMPLI_INVOICE_APP_APPLE_ID: undefined,
-};
+import { buildTestApp } from "./test-helpers.js";
 
 describe("request validation", () => {
   it("returns 400 for malformed sync body", async () => {
-    const app = buildApp(testEnv);
+    const app = buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/v1/subscriptions/sync",
@@ -22,7 +14,7 @@ describe("request validation", () => {
   });
 
   it("returns 400 for malformed webhook body", async () => {
-    const app = buildApp(testEnv);
+    const app = buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/v1/webhooks/app-store",
@@ -33,7 +25,7 @@ describe("request validation", () => {
   });
 
   it("returns 400 (not 500) for invalid signedTransactionInfo on sync", async () => {
-    const app = buildApp(testEnv);
+    const app = buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/v1/subscriptions/sync",

@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.js";
 import { upsertSubscription } from "../src/storage.js";
+import { buildTestAppWithContext, createTestContextFromEnv } from "./test-helpers.js";
 
 describe("entitlements", () => {
   let dir: string;
@@ -19,14 +19,8 @@ describe("entitlements", () => {
   });
 
   it("returns 400 without token", async () => {
-    const app = buildApp({
-      PORT: 0,
-      NODE_ENV: "test",
-      APPLE_ENVIRONMENT: "Sandbox",
-      SIMPLI_INVOICE_BUNDLE_ID: "co.simplitica.simpli-invoice",
-      SIMPLI_INVOICE_APP_APPLE_ID: undefined,
-    });
-
+    const { env, ctx } = await createTestContextFromEnv({ STORAGE_BACKEND: "file" });
+    const app = buildTestAppWithContext(env, ctx);
     const res = await app.inject({ method: "GET", url: "/v1/entitlements" });
     expect(res.statusCode).toBe(400);
   });
@@ -43,14 +37,8 @@ describe("entitlements", () => {
       environment: "Sandbox",
     });
 
-    const app = buildApp({
-      PORT: 0,
-      NODE_ENV: "test",
-      APPLE_ENVIRONMENT: "Sandbox",
-      SIMPLI_INVOICE_BUNDLE_ID: "co.simplitica.simpli-invoice",
-      SIMPLI_INVOICE_APP_APPLE_ID: undefined,
-    });
-
+    const { env, ctx } = await createTestContextFromEnv({ STORAGE_BACKEND: "file" });
+    const app = buildTestAppWithContext(env, ctx);
     const res = await app.inject({
       method: "GET",
       url: "/v1/entitlements",

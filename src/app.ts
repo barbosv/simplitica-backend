@@ -1,166 +1,72 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import type { Env } from "./env.js";
-import { z } from "zod";
-import { buildAppsRegistry } from "./apps.js";
-import { verifyNotificationForConfiguredApps } from "./apple/verify-notification.js";
-import { buildSignedDataVerifier } from "./apple/verifier.js";
-import { entitlementStateFromDecodedTransaction } from "./subscription-state.js";
-import { getEntitlement, upsertSubscription } from "./storage.js";
+import type { AppContext } from "./db/context.js";
+import { registerHealthRoutes } from "./routes/health.js";
+import { registerSubscriptionRoutes } from "./routes/subscriptions.js";
+import { registerStripeConnectRoutes } from "./routes/stripe-connect.js";
+import { registerStripeWebhookRoutes } from "./routes/stripe-webhook.js";
 
-function parseRequestBody<T>(schema: z.ZodType<T>, body: unknown): T | null {
-  const parsed = schema.safeParse(body);
-  return parsed.success ? parsed.data : null;
+declare module "fastify" {
+  interface FastifyRequest {
+    rawBody?: Buffer;
+  }
 }
 
-export function buildApp(env: Env) {
-  const app = Fastify({ logger: env.NODE_ENV !== "test" });
+export type BuildAppOptions = {
+  env: Env;
+  ctx: AppContext;
+};
 
-  app.register(cors, {
-    origin: true,
+export function buildApp({ env, ctx }: BuildAppOptions) {
+  const app = Fastify({
+    logger: env.NODE_ENV !== "test",
+    bodyLimit: 256 * 1024,
   });
 
-  app.get("/health", async () => {
-    return { ok: true };
-  });
-
-  const apps = buildAppsRegistry(env);
-
-  app.get("/v1/entitlements", async (req, reply) => {
-    const bundleId = req.headers["x-bundle-id"] as string | undefined;
-    const appSlugHeader = req.headers["x-app-slug"] as string | undefined;
-    const appSlug =
-      (bundleId && apps.byBundleId[bundleId]?.slug) ?? appSlugHeader ?? "simpli-invoice";
-    const token = req.headers["x-app-account-token"] as string | undefined;
-    if (!token) return reply.code(400).send({ error: "Missing X-App-Account-Token" });
-    const ent = await getEntitlement(appSlug, token);
-    return { entitlement: ent };
-  });
-
-  app.post("/v1/subscriptions/sync", async (req, reply) => {
-    const Body = z.object({
-      appSlug: z.string().optional(),
-      bundleId: z.string().optional(),
-      appAccountToken: z.string().uuid(),
-      signedTransactionInfo: z.string().min(10),
-      signedRenewalInfo: z.string().min(10).optional(),
-    });
-    const body = parseRequestBody(Body, req.body);
-    if (!body) return reply.code(400).send({ error: "Invalid request body" });
-
-    const appCfg =
-      (body.bundleId ? apps.byBundleId[body.bundleId] : undefined) ??
-      (body.appSlug ? apps.bySlug[body.appSlug] : undefined) ??
-      apps.bySlug["simpli-invoice"];
-    if (!appCfg) return reply.code(400).send({ error: "Unknown app" });
-
-    const verifier = buildSignedDataVerifier({
-      app: appCfg,
-      environment: env.APPLE_ENVIRONMENT,
-      enableOnlineChecks: env.NODE_ENV === "production",
-    });
-
-    let decoded;
+  app.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, body, done) => {
     try {
-      decoded = await verifier.verifyAndDecodeTransaction(body.signedTransactionInfo);
-    } catch {
-      return reply.code(400).send({ error: "Invalid signedTransactionInfo" });
+      const raw = body as Buffer;
+      req.rawBody = raw;
+      const json = JSON.parse(raw.toString("utf8")) as unknown;
+      done(null, json);
+    } catch (err) {
+      done(err as Error, undefined);
     }
-    const productId = decoded.productId;
-    const originalTransactionId = decoded.originalTransactionId;
-    if (!productId || !originalTransactionId) {
-      return reply.code(400).send({ error: "Missing productId/originalTransactionId in transaction" });
-    }
-
-    const expiresAtMs = decoded.expiresDate;
-    const expiresAt = typeof expiresAtMs === "number" ? new Date(expiresAtMs).toISOString() : undefined;
-
-    const state = entitlementStateFromDecodedTransaction(decoded);
-
-    const saved = await upsertSubscription({
-      appSlug: appCfg.slug,
-      appAccountToken: body.appAccountToken,
-      originalTransactionId,
-      productId,
-      state,
-      expiresAt,
-      environment: decoded.environment,
-      latestSignedTransactionInfo: body.signedTransactionInfo,
-      latestSignedRenewalInfo: body.signedRenewalInfo,
-    });
-
-    return { subscription: saved };
   });
 
-  app.post("/v1/webhooks/app-store", async (req, reply) => {
-    const Body = z.object({
-      signedPayload: z.string().min(10),
-      appSlug: z.string().optional(),
-    });
-    const body = parseRequestBody(Body, req.body);
-    if (!body) return reply.code(400).send({ error: "Invalid request body" });
+  if (env.NODE_ENV === "production") {
+    void app.register(helmet);
+  }
 
-    let decodedNotification;
-    let appCfg;
-    try {
-      const verified = await verifyNotificationForConfiguredApps({
-        signedPayload: body.signedPayload,
-        apps: apps.list,
-        env,
-      });
-      decodedNotification = verified.decoded;
-      appCfg = verified.app;
-    } catch {
-      return reply.code(400).send({ error: "Invalid signedPayload" });
-    }
-
-    if (body.appSlug && body.appSlug !== appCfg.slug) {
-      return reply.code(400).send({ error: "appSlug does not match notification" });
-    }
-
-    const verifier = buildSignedDataVerifier({
-      app: appCfg,
-      environment: env.APPLE_ENVIRONMENT,
-      enableOnlineChecks: env.NODE_ENV === "production",
-    });
-
-    const data = decodedNotification.data;
-    const signedTx = data?.signedTransactionInfo;
-    if (!signedTx) return reply.code(200).send({ ok: true });
-
-    let decodedTx;
-    try {
-      decodedTx = await verifier.verifyAndDecodeTransaction(signedTx);
-    } catch {
-      return reply.code(400).send({ error: "Invalid signedTransactionInfo" });
-    }
-    const productId = decodedTx.productId;
-    const originalTransactionId = decodedTx.originalTransactionId;
-    const appAccountToken = decodedTx.appAccountToken;
-
-    if (!productId || !originalTransactionId || !appAccountToken) {
-      return reply.code(200).send({ ok: true });
-    }
-
-    const expiresAtMs = decodedTx.expiresDate;
-    const expiresAt = typeof expiresAtMs === "number" ? new Date(expiresAtMs).toISOString() : undefined;
-    const state = entitlementStateFromDecodedTransaction(decodedTx);
-
-    await upsertSubscription({
-      appSlug: appCfg.slug,
-      appAccountToken,
-      originalTransactionId,
-      productId,
-      state,
-      expiresAt,
-      environment: decodedTx.environment,
-      latestSignedTransactionInfo: signedTx,
-      latestSignedRenewalInfo: data?.signedRenewalInfo,
-    });
-
-    return { ok: true };
+  const corsOrigin = env.CORS_ORIGIN?.trim();
+  void app.register(cors, {
+    origin: corsOrigin ? corsOrigin.split(",").map((o) => o.trim()) : false,
   });
+
+  void app.register(rateLimit, {
+    max: 120,
+    timeWindow: "1 minute",
+  });
+
+  void app.register(async (scoped) => {
+    await scoped.register(rateLimit, {
+      max: 10,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => {
+        const businessId = req.headers["x-business-id"];
+        const value = Array.isArray(businessId) ? businessId[0] : businessId;
+        return value ? `biz:${value}` : req.ip;
+      },
+    });
+    await registerStripeConnectRoutes(scoped, env, ctx);
+  });
+
+  void registerHealthRoutes(app, ctx);
+  void registerSubscriptionRoutes(app, env, ctx);
+  void registerStripeWebhookRoutes(app, env, ctx);
 
   return app;
 }
-
