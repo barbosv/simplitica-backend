@@ -23,8 +23,12 @@ async function main() {
   app.log.info({ port: env.PORT }, "listening");
 
   if (env.STORAGE_BACKEND === "postgres" && env.DATABASE_URL && env.RUN_MIGRATIONS) {
-    await runMigrations(getPool(env.DATABASE_URL));
-    app.log.info("migrations applied");
+    try {
+      await runMigrations(getPool(env.DATABASE_URL));
+      app.log.info("migrations applied");
+    } catch (err) {
+      app.log.error({ err }, "migrations failed (server still listening on /health)");
+    }
   }
 }
 
