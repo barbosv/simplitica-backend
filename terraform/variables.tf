@@ -96,7 +96,7 @@ variable "api_custom_domain" {
 variable "enable_api_domain_mapping" {
   type        = bool
   description = "Create Cloud Run domain mapping. Set true only after the Cloud Run service exists (first deploy via CI or gcloud)."
-  default     = false
+  default     = true
 }
 
 variable "stripe_secret_key" {
