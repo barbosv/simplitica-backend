@@ -11,7 +11,7 @@ export type AppContext = {
   databaseUrl: string | null;
 };
 
-export async function createAppContext(env: Env): Promise<AppContext> {
+export async function createAppContext(env: Env, opts?: { runMigrations?: boolean }): Promise<AppContext> {
   if (env.STORAGE_BACKEND === "file") {
     const memory = createMemoryRepositories();
     return {
@@ -33,7 +33,8 @@ export async function createAppContext(env: Env): Promise<AppContext> {
   }
 
   const pool = getPool(env.DATABASE_URL);
-  if (env.RUN_MIGRATIONS) {
+  const shouldMigrate = opts?.runMigrations ?? true;
+  if (shouldMigrate && env.RUN_MIGRATIONS) {
     await runMigrations(pool);
   }
 

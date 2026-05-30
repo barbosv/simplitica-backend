@@ -49,8 +49,8 @@ jobs:
       PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
       STRIPE_MODE: ${{ vars.STRIPE_MODE || 'test' }}
       APPLE_ENVIRONMENT: ${{ vars.APPLE_ENVIRONMENT || 'Production' }}
-      STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL }}
-      STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL }}
+      STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL || 'https://simplitica.co/stripe/return' }}
+      STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL || 'https://simplitica.co/stripe/refresh' }}
       STRIPE_PLATFORM_COUNTRY: ${{ vars.STRIPE_PLATFORM_COUNTRY || 'US' }}
       SIMPLI_INVOICE_BUNDLE_ID: ${{ vars.SIMPLI_INVOICE_BUNDLE_ID || 'co.simplitica.simpli-invoice' }}
       SIMPLI_INVOICE_APP_APPLE_ID: ${{ vars.SIMPLI_INVOICE_APP_APPLE_ID }}
@@ -75,6 +75,16 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 
+      - name: Validate deploy configuration
+        run: |
+          missing=()
+          [ -z "${{ env.GCP_PROJECT_ID }}" ] && missing+=("GCP_PROJECT_ID")
+          [ -z "${{ env.GCP_CLOUD_SQL_INSTANCE }}" ] && missing+=("GCP_CLOUD_SQL_INSTANCE")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing GitHub variables: ${missing[*]}"
+            exit 1
+          fi
+
       - name: Deploy to Cloud Run
         env:
           IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/simplitica-backend:${{ github.sha }}
@@ -90,6 +100,7 @@ jobs:
             --memory=512Mi
             --min-instances=1
             --timeout=60
+            --cpu-boost
             --add-cloudsql-instances="${{ env.GCP_CLOUD_SQL_INSTANCE }}"
             --set-secrets=DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest
             --set-env-vars="NODE_ENV=production,STORAGE_BACKEND=postgres,RUN_MIGRATIONS=true,STRIPE_MODE=${{ env.STRIPE_MODE }},APPLE_ENVIRONMENT=${{ env.APPLE_ENVIRONMENT }},STRIPE_CONNECT_RETURN_URL=${{ env.STRIPE_CONNECT_RETURN_URL }},STRIPE_CONNECT_REFRESH_URL=${{ env.STRIPE_CONNECT_REFRESH_URL }},STRIPE_PLATFORM_COUNTRY=${{ env.STRIPE_PLATFORM_COUNTRY }},SIMPLI_INVOICE_BUNDLE_ID=${{ env.SIMPLI_INVOICE_BUNDLE_ID }},SIMPLI_INVOICE_APP_APPLE_ID=${{ env.SIMPLI_INVOICE_APP_APPLE_ID }}"

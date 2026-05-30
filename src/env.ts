@@ -5,7 +5,9 @@ const BaseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APPLE_ENVIRONMENT: z.enum(["Sandbox", "Production"]).default("Sandbox"),
   SIMPLI_INVOICE_BUNDLE_ID: z.string().default("co.simplitica.simpli-invoice"),
-  SIMPLI_INVOICE_APP_APPLE_ID: z.coerce.number().int().positive().optional(),
+  SIMPLI_INVOICE_APP_APPLE_ID: z
+    .preprocess((value) => (value === "" || value === undefined ? undefined : value), z.coerce.number().int().positive())
+    .optional(),
   STORAGE_BACKEND: z.enum(["postgres", "file"]).default("postgres"),
   DATABASE_URL: z.string().optional(),
   RUN_MIGRATIONS: z.coerce.boolean().default(false),
