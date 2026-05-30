@@ -51,24 +51,109 @@ Create secrets (never commit values):
 | Secret | Description |
 |--------|-------------|
 | `DATABASE_URL` | Postgres URL (socket form above) |
-| `STRIPE_SECRET_KEY` | Test secret `sk_test_...` |
-| `STRIPE_WEBHOOK_SECRET` | Test webhook `whsec_...` |
-| `STRIPE_SECRET_KEY_LIVE` | Live secret (when going live) |
-| `STRIPE_WEBHOOK_SECRET_LIVE` | Live webhook secret |
+| `STRIPE_SECRET_KEY` | **Platform** test secret `sk_test_...` (not per-customer) |
+| `STRIPE_WEBHOOK_SECRET` | **Platform** test webhook `whsec_...` |
+| `STRIPE_SECRET_KEY_LIVE` | Platform live secret (when going live) |
+| `STRIPE_WEBHOOK_SECRET_LIVE` | Platform live webhook secret |
 
 Optional Apple / app secrets if not using plain env vars.
 
-## 3. Stripe Dashboard
+With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; see [`terraform/README.md`](terraform/README.md).
 
-1. **Connect**: enable Express accounts for your platform country (`STRIPE_PLATFORM_COUNTRY`, default `US`).
-2. **Webhooks**: endpoint `https://<cloud-run-url>/v1/webhooks/stripe`
-   - Events: `account.updated`, `checkout.session.completed`, `payment_intent.succeeded`
-   - Create **separate** test and live endpoints (or one URL with mode-specific secrets on the same service).
-3. **Onboarding URLs** (HTTPS; can redirect to the app):
-   - `STRIPE_CONNECT_RETURN_URL` — e.g. `https://simplitica.co/stripe/return`
-   - `STRIPE_CONNECT_REFRESH_URL` — e.g. `https://simplitica.co/stripe/refresh`
+## Stripe Connect model (platform vs customer)
 
-Set `STRIPE_MODE=test` or `live` on Cloud Run to select key pair.
+Contractors connect **their own** Stripe so clients can pay invoices online (Invoice Simple–style). The app uses **Stripe Connect Express**:
+
+1. Contractor taps **Settings → Get Paid Online → Connect With Stripe** in the iOS app.
+2. Backend creates a Stripe **connected account** and returns an onboarding URL.
+3. Contractor completes identity/bank setup on Stripe’s site.
+4. Invoice payment links charge the **connected account**; funds go to the contractor’s Stripe balance.
+
+| Role | Stripe account | API keys in app? |
+|------|----------------|------------------|
+| **Simplitica (platform)** | Your company’s Connect platform account | No — keys live only on the server (Secret Manager) |
+| **Each contractor** | Express connected account | No — onboarded via hosted Connect flow |
+
+The backend maps `X-Business-Id` → `stripeAccountId` in Postgres. Platform secrets (`STRIPE_SECRET_KEY`, webhooks) let the server create connected accounts and Checkout sessions on behalf of contractors; they are **not** the contractor’s keys.
+
+API contract: `voice-invoice/docs/STRIPE_CONNECT_API.md`.
+
+## Platform Stripe setup checklist
+
+Complete these steps **once** for Simplitica’s platform account (not per customer).
+
+### 1. Create and configure the platform account
+
+- [ ] Sign up at [Stripe Dashboard](https://dashboard.stripe.com) for **Simplitica** (your business).
+- [ ] **Settings → Connect** → enable Connect; choose **Express** accounts.
+- [ ] Set platform country to match `STRIPE_PLATFORM_COUNTRY` (default `US`).
+
+### 2. Test-mode keys (development / TestFlight)
+
+- [ ] **Developers → API keys** → copy **Secret key** (`sk_test_...`) → `terraform.tfvars` → `stripe_secret_key`, or GSM `STRIPE_SECRET_KEY`.
+- [ ] Deploy backend (or run locally) so you have a public webhook URL for test mode.
+
+### 3. Test-mode webhook
+
+- [ ] **Developers → Webhooks → Add endpoint**
+- [ ] URL: `https://<cloud-run-url>/v1/webhooks/stripe` (local: use [Stripe CLI](https://stripe.com/docs/stripe-cli) `stripe listen --forward-to localhost:3000/v1/webhooks/stripe`)
+- [ ] Events: `account.updated`, `checkout.session.completed`, `payment_intent.succeeded`
+- [ ] Copy **Signing secret** (`whsec_...`) → `stripe_webhook_secret` / GSM `STRIPE_WEBHOOK_SECRET`
+
+### 4. Onboarding return URLs (platform-wide)
+
+Set on Cloud Run / GitHub Actions (HTTPS; may redirect to the app):
+
+- [ ] `STRIPE_CONNECT_RETURN_URL` — e.g. `https://simplitica.co/stripe/return`
+- [ ] `STRIPE_CONNECT_REFRESH_URL` — e.g. `https://simplitica.co/stripe/refresh`
+
+### 5. Live mode (App Store production)
+
+- [ ] Toggle Dashboard to **Live**; repeat API key + webhook for live mode.
+- [ ] Store `sk_live_...` and live `whsec_...` in GSM (`STRIPE_SECRET_KEY_LIVE`, `STRIPE_WEBHOOK_SECRET_LIVE`) or add to `terraform.tfvars` and re-apply.
+- [ ] Set GitHub variable / Cloud Run `STRIPE_MODE=live`.
+
+### 6. Validate contractor flow (not platform setup)
+
+- [ ] In TestFlight: **Connect With Stripe** → complete onboarding.
+- [ ] Create invoice payment link → pay with test card `4242 4242 4242 4242`.
+- [ ] Confirm `GET .../payment-status` returns `"status": "paid"`.
+
+Customers do **not** need to create Stripe apps, paste `sk_live_...`, or configure webhooks themselves.
+
+## 3. Stripe Dashboard (quick reference)
+
+Same as the checklist above:
+
+1. **Connect**: Express accounts for `STRIPE_PLATFORM_COUNTRY`.
+2. **Webhooks**: `https://<cloud-run-url>/v1/webhooks/stripe` with events `account.updated`, `checkout.session.completed`, `payment_intent.succeeded`.
+3. **Onboarding URLs**: `STRIPE_CONNECT_RETURN_URL`, `STRIPE_CONNECT_REFRESH_URL`.
+
+Set `STRIPE_MODE=test` or `live` on Cloud Run to select the key pair.
+
+## 3b. Custom domain and TLS (`simpli-invoice.simplitica.co`)
+
+Terraform creates a **Cloud Run domain mapping** with a **Google-managed certificate** (no separate load balancer in this repo). See [`terraform/cloud_run_domain.tf`](terraform/cloud_run_domain.tf).
+
+**Order matters:**
+
+1. `terraform apply` with `enable_api_domain_mapping = false` (default).
+2. Deploy Cloud Run once (GitHub Actions push to `main`, or manual `gcloud run deploy`).
+3. Set `enable_api_domain_mapping = true` in `terraform.tfvars` and `terraform apply` again.
+4. If apply failed earlier with *Route simplitica-backend does not exist*: `terraform state rm 'google_cloud_run_domain_mapping.api[0]'` then re-apply.
+5. Add DNS records from `terraform output -json api_domain_dns_records` at your DNS host (`simplitica.co`).
+6. Wait for certificate provisioning (often 15–60 minutes after DNS propagates).
+
+```bash
+terraform output -raw api_base_url
+terraform output -json api_domain_dns_records
+curl -fsS "$(terraform output -raw api_base_url)/health"
+```
+
+Stripe webhooks: `https://simpli-invoice.simplitica.co/v1/webhooks/stripe`  
+iOS: `SIMPLITICA_BACKEND_BASE_URL = https://simpli-invoice.simplitica.co`
+
+To disable custom domain in Terraform, set `api_custom_domain = ""` in `terraform.tfvars`.
 
 ## 4. Build and deploy Cloud Run
 
@@ -103,13 +188,31 @@ Use `cloudbuild.yaml` for Cloud Build–triggered deploys (adjust substitutions)
 
 Pushes to `main` run tests, build a Docker image, push to Artifact Registry, and deploy to Cloud Run via [`.github/workflows/deploy-cloud-run.yml`](.github/workflows/deploy-cloud-run.yml). Pull requests run tests only.
 
-### One-time GCP setup (Workload Identity Federation)
+### One-time GCP setup (Terraform — preferred)
+
+Terraform in [`terraform/`](terraform/) provisions APIs, Artifact Registry, service accounts, Workload Identity Federation, Cloud SQL, and Secret Manager in one apply. See [`terraform/README.md`](terraform/README.md) for remote state setup.
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars: project_id, stripe_secret_key, stripe_webhook_secret
+
+terraform init
+terraform plan
+terraform apply
+```
+
+Map `terraform output` values to GitHub (see table below). Sections **1** and **2** above are handled by Terraform (`DATABASE_URL` is written to Secret Manager automatically).
+
+Set GitHub variable `GCP_RUNTIME_SERVICE_ACCOUNT` to `terraform output -raw runtime_service_account_email` (the deploy workflow passes it as `--service-account`). Set `PUBLIC_API_URL` to `terraform output -raw api_base_url` (e.g. `https://simpli-invoice.simplitica.co`) for smoke checks and documentation.
+
+<details>
+<summary>Manual gcloud setup (fallback)</summary>
 
 ```bash
 export PROJECT_ID=your-project
 export PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 
-# Enable APIs
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
@@ -119,13 +222,11 @@ gcloud services enable \
   iamcredentials.googleapis.com \
   --project="$PROJECT_ID"
 
-# Artifact Registry
 gcloud artifacts repositories create simplitica \
   --repository-format=docker \
   --location=us-central1 \
   --project="$PROJECT_ID"
 
-# Deploy service account
 gcloud iam service-accounts create github-deployer \
   --display-name="GitHub Actions deployer" \
   --project="$PROJECT_ID"
@@ -136,7 +237,6 @@ for ROLE in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccou
     --role="$ROLE"
 done
 
-# Runtime service account (Cloud Run execution)
 gcloud iam service-accounts create simplitica-backend \
   --display-name="Simplitica backend runtime" \
   --project="$PROJECT_ID"
@@ -147,7 +247,6 @@ for ROLE in roles/cloudsql.client roles/secretmanager.secretAccessor; do
     --role="$ROLE"
 done
 
-# Workload Identity Pool + OIDC provider
 gcloud iam workload-identity-pools create github-pool \
   --location=global \
   --project="$PROJECT_ID"
@@ -159,7 +258,6 @@ gcloud iam workload-identity-pools providers create-oidc github-provider \
   --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
   --project="$PROJECT_ID"
 
-# Allow only barbosv/simplitica-backend to impersonate the deploy SA
 gcloud iam service-accounts add-iam-policy-binding \
   "github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
   --role=roles/iam.workloadIdentityUser \
@@ -173,23 +271,27 @@ WIF provider resource name (GitHub secret `GCP_WORKLOAD_IDENTITY_PROVIDER`):
 projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider
 ```
 
+</details>
+
 ### GitHub repository configuration
 
 **Secrets** (Settings → Secrets and variables → Actions → Secrets)
 
 | Secret | Value |
 |--------|-------|
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full WIF provider resource name (see above) |
-| `GCP_SERVICE_ACCOUNT` | `github-deployer@PROJECT_ID.iam.gserviceaccount.com` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform output -raw workload_identity_provider` |
+| `GCP_SERVICE_ACCOUNT` | `terraform output -raw github_deployer_service_account_email` |
 
 **Variables** (Settings → Secrets and variables → Actions → Variables)
 
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `GCP_PROJECT_ID` | `your-project` | GCP project ID |
-| `GCP_REGION` | `us-central1` | Deploy region |
-| `GCP_ARTIFACT_REPO` | `simplitica` | Artifact Registry repo name |
-| `GCP_CLOUD_SQL_INSTANCE` | `your-project:us-central1:simplitica-db` | Cloud SQL instance connection |
+| Variable | Example / Terraform output | Purpose |
+|----------|---------------------------|---------|
+| `GCP_PROJECT_ID` | `terraform output -raw project_id` | GCP project ID |
+| `GCP_REGION` | `terraform output -raw region` | Deploy region |
+| `GCP_ARTIFACT_REPO` | `terraform output -raw artifact_registry_repository` | Artifact Registry repo name |
+| `GCP_CLOUD_SQL_INSTANCE` | `terraform output -raw cloud_sql_instance_connection_name` | Cloud SQL instance connection |
+| `GCP_RUNTIME_SERVICE_ACCOUNT` | `terraform output -raw runtime_service_account_email` | Cloud Run runtime SA (`--service-account` on deploy) |
+| `PUBLIC_API_URL` | `terraform output -raw api_base_url` | Public API base for smoke check (no trailing slash) |
 | `CLOUD_RUN_SERVICE` | `simplitica-backend` | Cloud Run service name |
 | `STRIPE_MODE` | `test` | Stripe key selection |
 | `APPLE_ENVIRONMENT` | `Production` | App Store environment |

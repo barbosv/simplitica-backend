@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars and fill in values. Never commit terraform.tfvars.
+
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Custom API host (Google-managed cert via Cloud Run domain mapping)
+api_custom_domain      = "simpli-invoice.simplitica.co"
+cloud_run_service_name = "simplitica-backend"
+# Set true only AFTER Cloud Run exists (first push to main or gcloud run deploy):
+# enable_api_domain_mapping = true
+# api_custom_domain = ""  # disable domain mapping entirely
+
+# Optional: restrict WIF to a different repo
+# github_repository = "barbosv/simplitica-backend"
+
+# Platform Stripe keys (Simplitica Connect account — NOT per-customer keys).
+# Contractors connect their own Stripe via in-app Express onboarding.
+# See DEPLOYMENT.md "Platform Stripe setup checklist".
+stripe_secret_key     = "sk_test_..."
+stripe_webhook_secret = "whsec_..."
+
+# Optional live keys (leave empty until going live)
+# stripe_secret_key_live     = "sk_live_..."
+# stripe_webhook_secret_live = "whsec_..."
+
+# Dev sandboxes may disable deletion protection
+# cloud_sql_deletion_protection = false
+
+# Default edition ENTERPRISE + tier db-f1-micro (low cost).
+# ENTERPRISE_PLUS requires tiers like db-perf-optimized-N-2:
+# cloud_sql_edition = "ENTERPRISE_PLUS"
+# cloud_sql_tier    = "db-perf-optimized-N-2"

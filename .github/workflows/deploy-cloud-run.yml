@@ -5,24 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Stripe mode"
+        required: true
+        default: "dev"
 
 permissions:
   contents: read
   id-token: write
 
-env:
-  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-  GCP_ARTIFACT_REPO: ${{ vars.GCP_ARTIFACT_REPO || 'simplitica' }}
-  GCP_CLOUD_SQL_INSTANCE: ${{ vars.GCP_CLOUD_SQL_INSTANCE }}
-  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'simplitica-backend' }}
-  STRIPE_MODE: ${{ vars.STRIPE_MODE || 'test' }}
-  APPLE_ENVIRONMENT: ${{ vars.APPLE_ENVIRONMENT || 'Production' }}
-  STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL }}
-  STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL }}
-  STRIPE_PLATFORM_COUNTRY: ${{ vars.STRIPE_PLATFORM_COUNTRY || 'US' }}
-  SIMPLI_INVOICE_BUNDLE_ID: ${{ vars.SIMPLI_INVOICE_BUNDLE_ID || 'co.simplitica.simpli-invoice' }}
-  SIMPLI_INVOICE_APP_APPLE_ID: ${{ vars.SIMPLI_INVOICE_APP_APPLE_ID }}
+
 
 jobs:
   test:
@@ -44,6 +38,22 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      GCP_ARTIFACT_REPO: ${{ vars.GCP_ARTIFACT_REPO || 'simplitica' }}
+      GCP_CLOUD_SQL_INSTANCE: ${{ vars.GCP_CLOUD_SQL_INSTANCE }}
+      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'simplitica-backend' }}
+      PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+      STRIPE_MODE: ${{ vars.STRIPE_MODE || 'test' }}
+      APPLE_ENVIRONMENT: ${{ vars.APPLE_ENVIRONMENT || 'Production' }}
+      STRIPE_CONNECT_RETURN_URL: ${{ vars.STRIPE_CONNECT_RETURN_URL }}
+      STRIPE_CONNECT_REFRESH_URL: ${{ vars.STRIPE_CONNECT_REFRESH_URL }}
+      STRIPE_PLATFORM_COUNTRY: ${{ vars.STRIPE_PLATFORM_COUNTRY || 'US' }}
+      SIMPLI_INVOICE_BUNDLE_ID: ${{ vars.SIMPLI_INVOICE_BUNDLE_ID || 'co.simplitica.simpli-invoice' }}
+      SIMPLI_INVOICE_APP_APPLE_ID: ${{ vars.SIMPLI_INVOICE_APP_APPLE_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,24 +79,34 @@ jobs:
         env:
           IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/simplitica-backend:${{ github.sha }}
         run: |
-          gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
-            --image="$IMAGE" \
-            --region="${{ env.GCP_REGION }}" \
-            --platform=managed \
-            --allow-unauthenticated \
-            --port=8080 \
-            --cpu=1 \
-            --memory=512Mi \
-            --min-instances=1 \
-            --timeout=60 \
-            --add-cloudsql-instances="${{ env.GCP_CLOUD_SQL_INSTANCE }}" \
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest \
+          DEPLOY_ARGS=(
+            "${{ env.CLOUD_RUN_SERVICE }}"
+            --image="$IMAGE"
+            --region="${{ env.GCP_REGION }}"
+            --platform=managed
+            --allow-unauthenticated
+            --port=8080
+            --cpu=1
+            --memory=512Mi
+            --min-instances=1
+            --timeout=60
+            --add-cloudsql-instances="${{ env.GCP_CLOUD_SQL_INSTANCE }}"
+            --set-secrets=DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest
             --set-env-vars="NODE_ENV=production,STORAGE_BACKEND=postgres,RUN_MIGRATIONS=true,STRIPE_MODE=${{ env.STRIPE_MODE }},APPLE_ENVIRONMENT=${{ env.APPLE_ENVIRONMENT }},STRIPE_CONNECT_RETURN_URL=${{ env.STRIPE_CONNECT_RETURN_URL }},STRIPE_CONNECT_REFRESH_URL=${{ env.STRIPE_CONNECT_REFRESH_URL }},STRIPE_PLATFORM_COUNTRY=${{ env.STRIPE_PLATFORM_COUNTRY }},SIMPLI_INVOICE_BUNDLE_ID=${{ env.SIMPLI_INVOICE_BUNDLE_ID }},SIMPLI_INVOICE_APP_APPLE_ID=${{ env.SIMPLI_INVOICE_APP_APPLE_ID }}"
+          )
+          if [ -n "${{ env.GCP_RUNTIME_SERVICE_ACCOUNT }}" ]; then
+            DEPLOY_ARGS+=(--service-account="${{ env.GCP_RUNTIME_SERVICE_ACCOUNT }}")
+          fi
+          gcloud run deploy "${DEPLOY_ARGS[@]}"
 
       - name: Smoke check
         run: |
-          URL=$(gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
-            --region="${{ env.GCP_REGION }}" \
-            --format='value(status.url)')
-          curl -fsS "$URL/health"
-          echo "Deployed to $URL"
+          if [ -n "${{ env.PUBLIC_API_URL }}" ]; then
+            BASE="${{ env.PUBLIC_API_URL }}"
+          else
+            BASE=$(gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
+              --region="${{ env.GCP_REGION }}" \
+              --format='value(status.url)')
+          fi
+          curl -fsS "${BASE%/}/health"
+          echo "Deployed to ${BASE}"
