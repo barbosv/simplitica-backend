@@ -9,7 +9,9 @@ Provisions one-time infrastructure for simplitica-backend:
 - Cloud SQL (PostgreSQL 16)
 - Secret Manager (`DATABASE_URL`, Stripe keys)
 
-Cloud Run is **not** managed here; [`.github/workflows/deploy-cloud-run.yml`](../.github/workflows/deploy-cloud-run.yml) deploys on push to `main`.
+Cloud Run is **not** managed here; `[.github/workflows/deploy-cloud-run.yml](../.github/workflows/deploy-cloud-run.yml)` deploys on push to `main`.
+
+
 
 ## Prerequisites
 
@@ -67,10 +69,12 @@ Copy outputs into GitHub repository settings (see [DEPLOYMENT.md](../DEPLOYMENT.
 
 Invoice payments use **Stripe Connect Express** (same pattern as Invoice Simple). Two different Stripe accounts are involved:
 
-| Who | Account type | Stored where | Who configures it |
-|-----|--------------|--------------|-------------------|
-| **Simplitica (you)** | Connect **platform** account | Secret Manager: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (from `terraform.tfvars`) | You once in [Stripe Dashboard](https://dashboard.stripe.com) |
-| **Each contractor** | **Connected** Express account | Postgres `stripeAccountId` per `X-Business-Id` | Customer in the app (**Settings → Connect With Stripe**) |
+
+| Who                  | Account type                  | Stored where                                                                           | Who configures it                                            |
+| -------------------- | ----------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Simplitica (you)** | Connect **platform** account  | Secret Manager: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (from `terraform.tfvars`) | You once in [Stripe Dashboard](https://dashboard.stripe.com) |
+| **Each contractor**  | **Connected** Express account | Postgres `stripeAccountId` per `X-Business-Id`                                         | Customer in the app (**Settings → Connect With Stripe**)     |
+
 
 `stripe_secret_key` and `stripe_webhook_secret` in `terraform.tfvars` are **your platform keys only**. Customers never paste API keys into the app; they complete Stripe-hosted onboarding and receive payments into **their** Stripe account.
 
@@ -78,7 +82,7 @@ Terraform does **not** store per-customer Stripe secrets. See [DEPLOYMENT.md § 
 
 ## Remote state (GCS)
 
-State is stored in **`gs://simplitica-terraform`** (prefix `simplitica-backend`). The backend is configured in [`versions.tf`](versions.tf).
+State is stored in `**gs://simplitica-terraform`** (prefix `simplitica-backend`). The backend is configured in `[versions.tf](versions.tf)`.
 
 ### First-time setup
 
@@ -93,7 +97,7 @@ gsutil versioning set on gs://simplitica-terraform
 
 If the name is taken, use e.g. `simplitica-terraform-${PROJECT_ID}` and update the `backend "gcs"` block in `versions.tf`.
 
-2. Initialize and migrate local state (if you previously used local state):
+1. Initialize and migrate local state (if you previously used local state):
 
 ```bash
 cd terraform
@@ -128,9 +132,9 @@ Default hostname: `simpli-invoice.simplitica.co` (`api_custom_domain`). Mapping 
 1. `terraform apply` (foundation only; domain mapping skipped).
 2. Deploy Cloud Run once (push to `main` or `gcloud run deploy simplitica-backend ...`).
 3. If a previous apply failed with *Route simplitica-backend does not exist*, remove the broken mapping from state:
-   ```bash
+  ```bash
    terraform state rm 'google_cloud_run_domain_mapping.api[0]' 2>/dev/null || true
-   ```
+  ```
 4. Set `enable_api_domain_mapping = true` in `terraform.tfvars`, then `terraform apply`.
 5. Configure DNS from `terraform output -json api_domain_dns_records`.
 6. Set GitHub variable `PUBLIC_API_URL` to `terraform output -raw api_base_url`.
@@ -139,15 +143,17 @@ There is no separate HTTPS load balancer; Cloud Run domain mapping provisions th
 
 ## Files
 
-| File | Resources |
-|------|-----------|
-| `apis.tf` | Required GCP APIs |
-| `artifact_registry.tf` | Docker repository |
-| `service_accounts.tf` | Deploy + runtime SAs, project IAM |
-| `workload_identity.tf` | WIF pool, OIDC provider, GitHub binding |
-| `cloud_sql.tf` | Postgres instance, database, user, password |
-| `cloud_run_domain.tf` | Custom domain + Google-managed TLS for Cloud Run |
-| `secrets.tf` | GSM secrets and runtime SA access |
+
+| File                   | Resources                                        |
+| ---------------------- | ------------------------------------------------ |
+| `apis.tf`              | Required GCP APIs                                |
+| `artifact_registry.tf` | Docker repository                                |
+| `service_accounts.tf`  | Deploy + runtime SAs, project IAM                |
+| `workload_identity.tf` | WIF pool, OIDC provider, GitHub binding          |
+| `cloud_sql.tf`         | Postgres instance, database, user, password      |
+| `cloud_run_domain.tf`  | Custom domain + Google-managed TLS for Cloud Run |
+| `secrets.tf`           | GSM secrets and runtime SA access                |
+
 
 ## Updating Stripe live secrets
 
