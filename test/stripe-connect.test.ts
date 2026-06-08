@@ -44,23 +44,27 @@ describe("stripe connect routes", () => {
     expect(refreshRes.body).toContain("simpli-invoice://settings/stripe");
   });
 
-  it("serves Stripe Checkout payment landing pages", async () => {
+  it("serves customer-facing Checkout receipt pages without app links", async () => {
     const app = buildApp({ env: testEnv(), ctx: createTestContext() });
     const successRes = await app.inject({
       method: "GET",
       url: `/payment/success?invoiceId=${invoiceId}`,
     });
     expect(successRes.statusCode).toBe(200);
-    expect(successRes.body).toContain("Payment received");
-    expect(successRes.body).toContain(`simpli-invoice://payment/success?invoiceId=${invoiceId}`);
+    expect(successRes.body).toContain("Payment complete");
+    expect(successRes.body).toContain("Thank you");
+    expect(successRes.body).toContain("You can close this window");
+    expect(successRes.body).not.toContain("simpli-invoice://");
+    expect(successRes.body).not.toContain("Open Simpli Invoice");
 
     const cancelRes = await app.inject({
       method: "GET",
       url: `/payment/cancel?invoiceId=${invoiceId}`,
     });
     expect(cancelRes.statusCode).toBe(200);
-    expect(cancelRes.body).toContain("Payment canceled");
-    expect(cancelRes.body).toContain(`simpli-invoice://payment/cancel?invoiceId=${invoiceId}`);
+    expect(cancelRes.body).toContain("Payment not completed");
+    expect(cancelRes.body).not.toContain("simpli-invoice://");
+    expect(cancelRes.body).not.toContain("Open Simpli Invoice");
   });
 
   it("returns 503 for payment-status when stripe is not configured", async () => {

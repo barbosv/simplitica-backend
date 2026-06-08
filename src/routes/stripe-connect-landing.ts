@@ -1,44 +1,84 @@
 import type { FastifyInstance } from "fastify";
 
-function landingPage(title: string, message: string, actionHref: string, actionLabel: string): string {
+const baseStyles = `
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 2rem 1.25rem;
+      line-height: 1.55;
+      color: #1a1a1a;
+      background: #f8fafc;
+    }
+    main {
+      max-width: 28rem;
+      margin: 0 auto;
+      padding: 1.75rem 1.5rem;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.75rem; }
+    p { margin: 0 0 0.75rem; color: #334155; }
+    .footer { margin-top: 1.25rem; font-size: 0.875rem; color: #64748b; }
+    a.cta {
+      display: inline-block;
+      margin-top: 1.25rem;
+      padding: 0.75rem 1.25rem;
+      background: #2563eb;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+`;
+
+/** Contractor Stripe Connect onboarding — returns to the iOS app. */
+function contractorHandoffPage(
+  title: string,
+  message: string,
+  actionHref: string,
+  actionLabel: string,
+): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${title}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 2rem; line-height: 1.5; color: #1a1a1a; }
-    a { display: inline-block; margin-top: 1.25rem; padding: 0.75rem 1.25rem; background: #2563eb; color: #fff; text-decoration: none; border-radius: 8px; }
-  </style>
+  <style>${baseStyles}</style>
 </head>
 <body>
-  <h1>${title}</h1>
-  <p>${message}</p>
-  <a href="${actionHref}">${actionLabel}</a>
+  <main>
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <a class="cta" href="${actionHref}">${actionLabel}</a>
+  </main>
   <script>
-    // Best-effort app handoff. If the app is unavailable, the user keeps this page.
     setTimeout(function () { window.location.href = ${JSON.stringify(actionHref)}; }, 250);
   </script>
 </body>
 </html>`;
 }
 
-function normalizedPaymentDeepLink(
-  appReturnUrl: unknown,
-  outcome: "success" | "cancel",
-  invoiceId: string | undefined,
-): string {
-  if (typeof appReturnUrl === "string" && appReturnUrl.length > 0) {
-    try {
-      const parsed = new URL(appReturnUrl);
-      if (parsed.protocol === "simpli-invoice:") return parsed.toString();
-    } catch {
-      // Ignore malformed appReturnUrl and fall back to generated deep link.
-    }
-  }
-  const qp = invoiceId ? `?invoiceId=${encodeURIComponent(invoiceId)}` : "";
-  return `simpli-invoice://payment/${outcome}${qp}`;
+/** Customer Checkout receipt — no app install or deep link. */
+function customerReceiptPage(title: string, message: string, footer: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <style>${baseStyles}</style>
+</head>
+<body>
+  <main>
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <p class="footer">${footer}</p>
+  </main>
+</body>
+</html>`;
 }
 
 /** Stripe Connect Account Links redirect here after onboarding (HTTPS required by Stripe). */
@@ -47,7 +87,7 @@ export function registerStripeConnectLandingRoutes(app: FastifyInstance): void {
     return reply
       .type("text/html; charset=utf-8")
       .send(
-        landingPage(
+        contractorHandoffPage(
           "Stripe setup complete",
           "Return to Simpli Invoice and tap Refresh Status to confirm your account is ready.",
           "simpli-invoice://settings/stripe",
@@ -60,7 +100,7 @@ export function registerStripeConnectLandingRoutes(app: FastifyInstance): void {
     return reply
       .type("text/html; charset=utf-8")
       .send(
-        landingPage(
+        contractorHandoffPage(
           "Continue Stripe setup",
           "This link expired. Open Simpli Invoice and tap Connect With Stripe to continue.",
           "simpli-invoice://settings/stripe",
@@ -69,32 +109,26 @@ export function registerStripeConnectLandingRoutes(app: FastifyInstance): void {
       );
   });
 
-  app.get("/payment/success", async (req, reply) => {
-    const query = req.query as { invoiceId?: string; appReturnUrl?: string };
-    const appURL = normalizedPaymentDeepLink(query.appReturnUrl, "success", query.invoiceId);
+  app.get("/payment/success", async (_req, reply) => {
     return reply
       .type("text/html; charset=utf-8")
       .send(
-        landingPage(
-          "Payment received",
-          "Thanks! Your payment was submitted successfully.",
-          appURL,
-          "Open Simpli Invoice",
+        customerReceiptPage(
+          "Payment complete",
+          "Thank you — your payment was received successfully. A receipt may be sent by email if your payment method provides one.",
+          "You can close this window.",
         ),
       );
   });
 
-  app.get("/payment/cancel", async (req, reply) => {
-    const query = req.query as { invoiceId?: string; appReturnUrl?: string };
-    const appURL = normalizedPaymentDeepLink(query.appReturnUrl, "cancel", query.invoiceId);
+  app.get("/payment/cancel", async (_req, reply) => {
     return reply
       .type("text/html; charset=utf-8")
       .send(
-        landingPage(
-          "Payment canceled",
-          "No charge was made. You can return to the invoice and try again anytime.",
-          appURL,
-          "Open Simpli Invoice",
+        customerReceiptPage(
+          "Payment not completed",
+          "No charge was made. You can close this page and use the payment link from your invoice if you would like to try again.",
+          "You can close this window.",
         ),
       );
   });
