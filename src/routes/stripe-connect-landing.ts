@@ -16,8 +16,29 @@ function landingPage(title: string, message: string, actionHref: string, actionL
   <h1>${title}</h1>
   <p>${message}</p>
   <a href="${actionHref}">${actionLabel}</a>
+  <script>
+    // Best-effort app handoff. If the app is unavailable, the user keeps this page.
+    setTimeout(function () { window.location.href = ${JSON.stringify(actionHref)}; }, 250);
+  </script>
 </body>
 </html>`;
+}
+
+function normalizedPaymentDeepLink(
+  appReturnUrl: unknown,
+  outcome: "success" | "cancel",
+  invoiceId: string | undefined,
+): string {
+  if (typeof appReturnUrl === "string" && appReturnUrl.length > 0) {
+    try {
+      const parsed = new URL(appReturnUrl);
+      if (parsed.protocol === "simpli-invoice:") return parsed.toString();
+    } catch {
+      // Ignore malformed appReturnUrl and fall back to generated deep link.
+    }
+  }
+  const qp = invoiceId ? `?invoiceId=${encodeURIComponent(invoiceId)}` : "";
+  return `simpli-invoice://payment/${outcome}${qp}`;
 }
 
 /** Stripe Connect Account Links redirect here after onboarding (HTTPS required by Stripe). */
@@ -43,6 +64,36 @@ export function registerStripeConnectLandingRoutes(app: FastifyInstance): void {
           "Continue Stripe setup",
           "This link expired. Open Simpli Invoice and tap Connect With Stripe to continue.",
           "simpli-invoice://settings/stripe",
+          "Open Simpli Invoice",
+        ),
+      );
+  });
+
+  app.get("/payment/success", async (req, reply) => {
+    const query = req.query as { invoiceId?: string; appReturnUrl?: string };
+    const appURL = normalizedPaymentDeepLink(query.appReturnUrl, "success", query.invoiceId);
+    return reply
+      .type("text/html; charset=utf-8")
+      .send(
+        landingPage(
+          "Payment received",
+          "Thanks! Your payment was submitted successfully.",
+          appURL,
+          "Open Simpli Invoice",
+        ),
+      );
+  });
+
+  app.get("/payment/cancel", async (req, reply) => {
+    const query = req.query as { invoiceId?: string; appReturnUrl?: string };
+    const appURL = normalizedPaymentDeepLink(query.appReturnUrl, "cancel", query.invoiceId);
+    return reply
+      .type("text/html; charset=utf-8")
+      .send(
+        landingPage(
+          "Payment canceled",
+          "No charge was made. You can return to the invoice and try again anytime.",
+          appURL,
           "Open Simpli Invoice",
         ),
       );

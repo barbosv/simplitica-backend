@@ -35,10 +35,32 @@ describe("stripe connect routes", () => {
     expect(returnRes.statusCode).toBe(200);
     expect(returnRes.headers["content-type"]).toContain("text/html");
     expect(returnRes.body).toContain("Stripe setup complete");
+    expect(returnRes.body).toContain("simpli-invoice://settings/stripe");
+    expect(returnRes.body).toContain("Open Simpli Invoice");
 
     const refreshRes = await app.inject({ method: "GET", url: "/stripe/refresh" });
     expect(refreshRes.statusCode).toBe(200);
     expect(refreshRes.body).toContain("Continue Stripe setup");
+    expect(refreshRes.body).toContain("simpli-invoice://settings/stripe");
+  });
+
+  it("serves Stripe Checkout payment landing pages", async () => {
+    const app = buildApp({ env: testEnv(), ctx: createTestContext() });
+    const successRes = await app.inject({
+      method: "GET",
+      url: `/payment/success?invoiceId=${invoiceId}`,
+    });
+    expect(successRes.statusCode).toBe(200);
+    expect(successRes.body).toContain("Payment received");
+    expect(successRes.body).toContain(`simpli-invoice://payment/success?invoiceId=${invoiceId}`);
+
+    const cancelRes = await app.inject({
+      method: "GET",
+      url: `/payment/cancel?invoiceId=${invoiceId}`,
+    });
+    expect(cancelRes.statusCode).toBe(200);
+    expect(cancelRes.body).toContain("Payment canceled");
+    expect(cancelRes.body).toContain(`simpli-invoice://payment/cancel?invoiceId=${invoiceId}`);
   });
 
   it("returns 503 for payment-status when stripe is not configured", async () => {
@@ -89,6 +111,78 @@ describe("stripe webhook handler", () => {
     const payment = await repos.invoicePayments.get(businessId, invoiceId);
     expect(payment?.status).toBe("paid");
     expect(payment?.paidAt).toBeTruthy();
+  });
+
+  it("marks invoice paid on checkout.session.async_payment_succeeded", async () => {
+    const repos = createMemoryRepositories();
+    await repos.businesses.getOrCreate(businessId);
+    await repos.invoicePayments.upsert({
+      businessId,
+      invoiceId,
+      idempotencyKey: `${invoiceId}:2`,
+      amountCents: 1000,
+      currency: "usd",
+      invoiceNumber: "INV-2",
+      customerEmail: null,
+      checkoutSessionId: "cs_test_async",
+      paymentUrl: "https://checkout.stripe.com/pay/cs_test_async",
+      status: "pending",
+      paidAt: null,
+      expiresAt: null,
+    });
+
+    const event = {
+      id: "evt_test_async",
+      type: "checkout.session.async_payment_succeeded",
+      data: {
+        object: {
+          id: "cs_test_async",
+          payment_status: "paid",
+          created: Math.floor(Date.now() / 1000),
+          metadata: { businessId, invoiceId },
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await handleStripeWebhookEvent(repos, event);
+    const payment = await repos.invoicePayments.get(businessId, invoiceId);
+    expect(payment?.status).toBe("paid");
+  });
+
+  it("marks invoice paid by session id when metadata is missing", async () => {
+    const repos = createMemoryRepositories();
+    await repos.businesses.getOrCreate(businessId);
+    await repos.invoicePayments.upsert({
+      businessId,
+      invoiceId,
+      idempotencyKey: `${invoiceId}:3`,
+      amountCents: 1000,
+      currency: "usd",
+      invoiceNumber: "INV-3",
+      customerEmail: null,
+      checkoutSessionId: "cs_test_no_meta",
+      paymentUrl: "https://checkout.stripe.com/pay/cs_test_no_meta",
+      status: "pending",
+      paidAt: null,
+      expiresAt: null,
+    });
+
+    const event = {
+      id: "evt_test_no_meta",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_no_meta",
+          payment_status: "paid",
+          created: Math.floor(Date.now() / 1000),
+          metadata: {},
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await handleStripeWebhookEvent(repos, event);
+    const payment = await repos.invoicePayments.get(businessId, invoiceId);
+    expect(payment?.status).toBe("paid");
   });
 
   it("deduplicates stripe events", async () => {

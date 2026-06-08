@@ -39,6 +39,12 @@ export async function createCheckoutSession(
         businessId: params.businessId,
         invoiceId: params.invoiceId,
       },
+      payment_intent_data: {
+        metadata: {
+          businessId: params.businessId,
+          invoiceId: params.invoiceId,
+        },
+      },
     },
     {
       stripeAccount: params.stripeAccountId,
