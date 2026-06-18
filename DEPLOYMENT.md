@@ -55,10 +55,13 @@ Create secrets (never commit values):
 | `STRIPE_WEBHOOK_SECRET` | **Platform** test webhook `whsec_...` |
 | `STRIPE_SECRET_KEY_LIVE` | Platform live secret (when going live) |
 | `STRIPE_WEBHOOK_SECRET_LIVE` | Platform live webhook secret |
+| `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing |
 
 Optional Apple / app secrets if not using plain env vars.
 
-With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; see [`terraform/README.md`](terraform/README.md).
+With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts it via `--set-secrets`.
+
+**After adding the secret**, redeploy Cloud Run so `/v1/pricing/materials` is available (route ships with simplitica-backend main).
 
 ## Stripe Connect model (platform vs customer)
 

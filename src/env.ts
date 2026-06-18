@@ -20,6 +20,9 @@ const BaseEnvSchema = z.object({
   STRIPE_CONNECT_REFRESH_URL: z.string().url().optional(),
   STRIPE_PLATFORM_COUNTRY: z.string().default("US"),
   CORS_ORIGIN: z.string().optional(),
+  HOME_DEPOT_DATA_API_KEY: z.string().optional(),
+  HOME_DEPOT_DATA_API_BASE_URL: z.string().url().optional(),
+  HOME_DEPOT_DATA_API_HOST: z.string().optional(),
 });
 
 export type Env = z.infer<typeof BaseEnvSchema>;

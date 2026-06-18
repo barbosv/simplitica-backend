@@ -20,6 +20,14 @@ locals {
     STRIPE_SECRET_KEY_LIVE       = var.stripe_secret_key_live
     STRIPE_WEBHOOK_SECRET_LIVE   = var.stripe_webhook_secret_live
   }
+
+  pricing_secret_ids = toset(
+    length(nonsensitive(var.home_depot_data_api_key)) > 0 ? ["HOME_DEPOT_DATA_API_KEY"] : []
+  )
+
+  pricing_secret_values = {
+    HOME_DEPOT_DATA_API_KEY = var.home_depot_data_api_key
+  }
 }
 
 resource "google_secret_manager_secret" "database_url" {
@@ -56,10 +64,30 @@ resource "google_secret_manager_secret_version" "stripe" {
   secret_data = local.stripe_secret_values[each.key]
 }
 
+resource "google_secret_manager_secret" "pricing" {
+  for_each = local.pricing_secret_ids
+
+  secret_id = each.key
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_secret_manager_secret_version" "pricing" {
+  for_each = local.pricing_secret_ids
+
+  secret      = google_secret_manager_secret.pricing[each.key].id
+  secret_data = local.pricing_secret_values[each.key]
+}
+
 resource "google_secret_manager_secret_iam_member" "runtime" {
   for_each = merge(
     { DATABASE_URL = google_secret_manager_secret.database_url.id },
     { for name, secret in google_secret_manager_secret.stripe : name => secret.id },
+    { for name, secret in google_secret_manager_secret.pricing : name => secret.id },
   )
 
   secret_id = each.value

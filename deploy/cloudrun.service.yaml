@@ -47,6 +47,11 @@ spec:
                 secretKeyRef:
                   name: STRIPE_WEBHOOK_SECRET
                   key: latest
+            - name: HOME_DEPOT_DATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: HOME_DEPOT_DATA_API_KEY
+                  key: latest
           startupProbe:
             httpGet:
               path: /health/ready

@@ -1,0 +1,119 @@
+{
+  "faucet": {
+    "search_query": "kitchen faucet chrome",
+    "fallback_price": 85
+  },
+  "supply_lines": {
+    "search_query": "faucet supply lines 2 pack",
+    "fallback_price": 25
+  },
+  "paint": {
+    "search_query": "interior paint gallon",
+    "fallback_price": 45
+  },
+  "primer": {
+    "search_query": "interior primer gallon",
+    "fallback_price": 35
+  },
+  "supplies": {
+    "search_query": "painting supplies kit",
+    "fallback_price": 25
+  },
+  "consumables": {
+    "search_query": "cleaning supplies bundle",
+    "fallback_price": 20
+  },
+  "window_unit": {
+    "search_query": "vinyl replacement window",
+    "fallback_price": 250
+  },
+  "flashing": {
+    "search_query": "roof flashing roll",
+    "fallback_price": 45
+  },
+  "caulk": {
+    "search_query": "exterior caulk tube",
+    "fallback_price": 12
+  },
+  "shingles": {
+    "search_query": "architectural shingles bundle",
+    "fallback_price": 120
+  },
+  "drywall": {
+    "search_query": "drywall sheet 4x8",
+    "fallback_price": 35
+  },
+  "mud": {
+    "search_query": "joint compound bucket",
+    "fallback_price": 20
+  },
+  "wire": {
+    "search_query": "12 gauge electrical wire",
+    "fallback_price": 40
+  },
+  "devices": {
+    "search_query": "electrical outlet receptacle",
+    "fallback_price": 35
+  },
+  "parts": {
+    "search_query": "HVAC repair parts kit",
+    "fallback_price": 85
+  },
+  "refrigerant": {
+    "search_query": "HVAC refrigerant r410a",
+    "fallback_price": 45
+  },
+  "plants": {
+    "search_query": "landscaping shrubs",
+    "fallback_price": 60
+  },
+  "mulch": {
+    "search_query": "hardwood mulch 2 cu ft",
+    "fallback_price": 40
+  },
+  "flooring": {
+    "search_query": "hardwood flooring",
+    "fallback_price": 150,
+    "price_mode": "per_sq_ft_proxy"
+  },
+  "underlayment": {
+    "search_query": "flooring underlayment roll",
+    "fallback_price": 40
+  },
+  "lumber": {
+    "search_query": "pressure treated lumber 2x4",
+    "fallback_price": 400
+  },
+  "hardware": {
+    "search_query": "deck hardware kit",
+    "fallback_price": 80
+  },
+  "concrete": {
+    "search_query": "concrete mix 80 lb bag",
+    "fallback_price": 200
+  },
+  "posts": {
+    "search_query": "fence posts 4x4",
+    "fallback_price": 120
+  },
+  "panels": {
+    "search_query": "privacy fence panels",
+    "fallback_price": 280
+  },
+  "rebar": {
+    "search_query": "rebar #4 20 ft",
+    "fallback_price": 60
+  },
+  "disposal": {
+    "search_query": "construction debris bag",
+    "fallback_price": 150
+  },
+  "gutter_parts": {
+    "search_query": "gutter section 10 ft",
+    "fallback_price": 55
+  },
+  "sealant": {
+    "search_query": "gutter sealant",
+    "fallback_price": 15
+  }
+}

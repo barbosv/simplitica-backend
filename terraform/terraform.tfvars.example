@@ -23,6 +23,9 @@ stripe_webhook_secret = "whsec_..."
 # stripe_secret_key_live     = "sk_live_..."
 # stripe_webhook_secret_live = "whsec_..."
 
+# Optional Home Depot retail data API (RapidAPI / OpenWeb Ninja)
+# home_depot_data_api_key = "your-rapidapi-key"
+
 # Dev sandboxes may disable deletion protection
 # cloud_sql_deletion_protection = false
 

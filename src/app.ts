@@ -9,6 +9,7 @@ import { registerSubscriptionRoutes } from "./routes/subscriptions.js";
 import { registerStripeConnectRoutes } from "./routes/stripe-connect.js";
 import { registerStripeConnectLandingRoutes } from "./routes/stripe-connect-landing.js";
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook.js";
+import { registerPricingRoutes } from "./routes/pricing.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -69,6 +70,7 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
   registerStripeConnectLandingRoutes(app);
   void registerSubscriptionRoutes(app, env, ctx);
   void registerStripeWebhookRoutes(app, env, ctx);
+  registerPricingRoutes(app, env);
 
   return app;
 }

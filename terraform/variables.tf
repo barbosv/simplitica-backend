@@ -124,3 +124,10 @@ variable "stripe_webhook_secret_live" {
   default     = ""
   description = "Optional Stripe live webhook signing secret."
 }
+
+variable "home_depot_data_api_key" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "Optional third-party Home Depot retail data API key (RapidAPI / OpenWeb Ninja)."
+}

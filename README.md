@@ -9,8 +9,19 @@ Shared backend for Simpli Invoice and future iOS apps: **Apple subscription sync
 - `POST /v1/stripe/connect/onboard`, `GET /v1/stripe/connect/status`
 - `POST /v1/invoices/:invoiceId/payment-link`, `GET /v1/invoices/:invoiceId/payment-status`
 - `POST /v1/webhooks/stripe`
+- `POST /v1/pricing/materials` — Home Depot material pricing for estimate suggestions (iOS client)
 
 Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for local subscription-only dev).
+
+### Pricing environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `HOME_DEPOT_DATA_API_KEY` | No | OpenWeb Ninja direct key (`ak_...`) or RapidAPI key |
+| `HOME_DEPOT_DATA_API_BASE_URL` | No | Default: `https://api.openwebninja.com/realtime-homedepot-data` (direct). Set RapidAPI URL if using RapidAPI. |
+| `HOME_DEPOT_DATA_API_HOST` | No | **RapidAPI only** — sets `X-RapidAPI-Host`. Leave unset for OpenWeb direct (`x-api-key` auth). |
+
+Keys starting with `ak_` auto-select OpenWeb direct mode. Without `HOME_DEPOT_DATA_API_KEY`, `/v1/pricing/materials` returns catalog fallback prices from `src/pricing/material_catalog.json`.
 
 ## Quick start
 

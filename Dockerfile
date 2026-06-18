@@ -6,6 +6,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY migrations ./migrations
 RUN npm run build
+RUN mkdir -p dist/src/pricing && cp src/pricing/material_catalog.json dist/src/pricing/
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
