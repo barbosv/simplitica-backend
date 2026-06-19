@@ -22,6 +22,7 @@ export type MaterialsPricingResponse = {
   total_cost: number;
   line_items: Record<string, number>;
   source: "home_depot" | "catalog_fallback";
+  live_lookup_attempted: boolean;
 };
 
 const materialCatalog = JSON.parse(
@@ -30,10 +31,16 @@ const materialCatalog = JSON.parse(
 
 export class MaterialsPricingService {
   private readonly provider: RetailPriceProvider;
+  private readonly liveLookupAvailable: boolean;
   private readonly cache: PricingCache;
 
-  constructor(provider: RetailPriceProvider, cache = new PricingCache()) {
+  constructor(
+    provider: RetailPriceProvider,
+    liveLookupAvailable: boolean,
+    cache = new PricingCache(),
+  ) {
     this.provider = provider;
+    this.liveLookupAvailable = liveLookupAvailable;
     this.cache = cache;
   }
 
@@ -42,10 +49,12 @@ export class MaterialsPricingService {
     const zip = request.zip_code?.trim() || undefined;
     const lineItems: Record<string, number> = {};
     let usedLiveProvider = false;
+    let attemptedLiveLookup = false;
 
     for (const key of request.materials) {
       const priced = await this.priceForMaterial(key, zip);
       lineItems[key] = roundMoney(priced.price * quantity);
+      if (priced.attemptedLiveLookup) attemptedLiveLookup = true;
       if (priced.live) usedLiveProvider = true;
     }
 
@@ -57,15 +66,16 @@ export class MaterialsPricingService {
       total_cost: total,
       line_items: lineItems,
       source: usedLiveProvider ? "home_depot" : "catalog_fallback",
+      live_lookup_attempted: attemptedLiveLookup,
     };
   }
 
   private async priceForMaterial(
     materialKey: string,
     zipCode?: string,
-  ): Promise<{ price: number; live: boolean }> {
+  ): Promise<{ price: number; live: boolean; attemptedLiveLookup: boolean }> {
     const entry = materialCatalog[materialKey];
-    if (!entry) return { price: 0, live: false };
+    if (!entry) return { price: 0, live: false, attemptedLiveLookup: false };
 
     const cacheKey = `${zipCode ?? "US"}:${materialKey}`;
     const cached = this.cache.get(cacheKey);
@@ -73,24 +83,30 @@ export class MaterialsPricingService {
       return {
         price: cached,
         live: cached !== entry.fallback_price,
+        attemptedLiveLookup: cached !== entry.fallback_price,
       };
     }
 
     let quote: { price: number } | null = null;
-    if (entry.default_item_id) {
-      quote = await this.provider.getProductById(entry.default_item_id, zipCode);
-    }
-    if (!quote) {
-      quote = await this.provider.searchProduct(entry.search_query, zipCode);
+    let attemptedLiveLookup = false;
+    if (this.liveLookupAvailable) {
+      if (entry.default_item_id) {
+        attemptedLiveLookup = true;
+        quote = await this.provider.getProductById(entry.default_item_id, zipCode);
+      }
+      if (!quote) {
+        attemptedLiveLookup = true;
+        quote = await this.provider.searchProduct(entry.search_query, zipCode);
+      }
     }
 
     if (quote) {
       this.cache.set(cacheKey, quote.price);
-      return { price: quote.price, live: true };
+      return { price: quote.price, live: true, attemptedLiveLookup: true };
     }
 
     this.cache.set(cacheKey, entry.fallback_price);
-    return { price: entry.fallback_price, live: false };
+    return { price: entry.fallback_price, live: false, attemptedLiveLookup };
   }
 }
 

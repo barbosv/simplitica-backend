@@ -21,6 +21,10 @@ class StubRetailProvider implements RetailPriceProvider {
   async getProductById(): Promise<RetailProductQuote | null> {
     return null;
   }
+
+  async lookupItem(): Promise<RetailProductQuote | null> {
+    return null;
+  }
 }
 
 describe("pricing materials", () => {
@@ -49,6 +53,7 @@ describe("pricing materials", () => {
       total_cost: 110,
       line_items: { faucet: 85, supply_lines: 25 },
       source: "catalog_fallback",
+      live_lookup_attempted: false,
     });
   });
 
@@ -57,13 +62,14 @@ describe("pricing materials", () => {
       faucet: 92,
       "supply lines": 28,
     });
-    const service = new MaterialsPricingService(provider);
+    const service = new MaterialsPricingService(provider, true);
     const result = await service.quote({
       materials: ["faucet", "supply_lines"],
       quantity: 1,
       zip_code: "30075",
     });
     expect(result.source).toBe("home_depot");
+    expect(result.live_lookup_attempted).toBe(true);
     expect(result.total_cost).toBe(120);
     expect(result.line_items).toEqual({ faucet: 92, supply_lines: 28 });
   });
@@ -79,5 +85,20 @@ describe("pricing materials", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().total_cost).toBeGreaterThan(0);
+  });
+
+  it("returns wage fallback when BLS key is missing", async () => {
+    const app = buildTestApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/pricing/wages",
+      payload: { soc_code: "47-2031", state_code: "GA", fallback: 24 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      hourly_wage: 24,
+      source: "template_fallback",
+      live_lookup_attempted: false,
+    });
   });
 });

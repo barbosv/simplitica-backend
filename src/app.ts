@@ -66,7 +66,7 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
     await registerStripeConnectRoutes(scoped, env, ctx);
   });
 
-  void registerHealthRoutes(app, ctx);
+  void registerHealthRoutes(app, env, ctx);
   registerStripeConnectLandingRoutes(app);
   void registerSubscriptionRoutes(app, env, ctx);
   void registerStripeWebhookRoutes(app, env, ctx);

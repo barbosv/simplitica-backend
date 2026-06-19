@@ -23,6 +23,7 @@ const BaseEnvSchema = z.object({
   HOME_DEPOT_DATA_API_KEY: z.string().optional(),
   HOME_DEPOT_DATA_API_BASE_URL: z.string().url().optional(),
   HOME_DEPOT_DATA_API_HOST: z.string().optional(),
+  BLS_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof BaseEnvSchema>;

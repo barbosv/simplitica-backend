@@ -5,6 +5,7 @@ export type RetailProductQuote = {
 
 export interface RetailPriceProvider {
   searchProduct(query: string, zipCode?: string): Promise<RetailProductQuote | null>;
+  lookupItem(search: string, zipCode?: string): Promise<RetailProductQuote | null>;
   getProductById(itemId: string, zipCode?: string): Promise<RetailProductQuote | null>;
 }
 
@@ -31,8 +32,15 @@ function asNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+export function isApiErrorPayload(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const status = (payload as Record<string, unknown>).status;
+  return typeof status === "string" && status.toUpperCase() === "ERROR";
+}
+
 export function extractPrice(payload: unknown): number | undefined {
   if (!payload || typeof payload !== "object") return undefined;
+  if (isApiErrorPayload(payload)) return undefined;
   const root = payload as Record<string, unknown>;
 
   const direct = asNumber(root.price ?? root.current_price ?? root.sale_price);
@@ -125,25 +133,63 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
 
   async searchProduct(query: string, zipCode?: string): Promise<RetailProductQuote | null> {
     if (!this.apiKey) return null;
-    const url = new URL(`${this.baseUrl}/search`);
-    url.searchParams.set("query", query);
-    if (zipCode) {
-      url.searchParams.set("zip", zipCode);
-      url.searchParams.set("zip_code", zipCode);
-    }
-    url.searchParams.set("limit", "1");
-    return this.request(url);
+
+    const searchUrl = new URL(`${this.baseUrl}/search`);
+    searchUrl.searchParams.set("query", query);
+    searchUrl.searchParams.set("page", "1");
+    searchUrl.searchParams.set("items_per_page", "1");
+    searchUrl.searchParams.set("sort_by", "best_match");
+    this.applyLocalization(searchUrl, zipCode);
+
+    const searchQuote = await this.request(searchUrl);
+    if (searchQuote) return searchQuote;
+
+    const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
+    lookupUrl.searchParams.set("search", query);
+    lookupUrl.searchParams.set("page", "1");
+    lookupUrl.searchParams.set("items_per_page", "1");
+    this.applyLocalization(lookupUrl, zipCode);
+    return this.request(lookupUrl);
+  }
+
+  async lookupItem(search: string, zipCode?: string): Promise<RetailProductQuote | null> {
+    if (!this.apiKey) return null;
+
+    const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
+    lookupUrl.searchParams.set("search", search);
+    lookupUrl.searchParams.set("page", "1");
+    lookupUrl.searchParams.set("items_per_page", "1");
+    this.applyLocalization(lookupUrl, zipCode);
+    return this.request(lookupUrl);
   }
 
   async getProductById(itemId: string, zipCode?: string): Promise<RetailProductQuote | null> {
     if (!this.apiKey) return null;
-    const url = new URL(`${this.baseUrl}/product`);
-    url.searchParams.set("item_id", itemId);
-    if (zipCode) {
-      url.searchParams.set("zip", zipCode);
-      url.searchParams.set("zip_code", zipCode);
+
+    const detailsUrl = new URL(`${this.baseUrl}/product-details`);
+    detailsUrl.searchParams.set("item_id", itemId);
+    this.applyLocalization(detailsUrl, zipCode);
+
+    const detailsQuote = await this.request(detailsUrl);
+    if (detailsQuote) return detailsQuote;
+
+    const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
+    lookupUrl.searchParams.set("search", itemId);
+    lookupUrl.searchParams.set("page", "1");
+    lookupUrl.searchParams.set("items_per_page", "1");
+    this.applyLocalization(lookupUrl, zipCode);
+    return this.request(lookupUrl);
+  }
+
+  private applyLocalization(url: URL, zipCode?: string, storeId?: string): void {
+    const zip = zipCode?.trim();
+    if (zip) {
+      url.searchParams.set("zipcode", zip);
     }
-    return this.request(url);
+    const store = storeId?.trim();
+    if (store) {
+      url.searchParams.set("store_id", store);
+    }
   }
 
   private async request(url: URL): Promise<RetailProductQuote | null> {
@@ -158,21 +204,30 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     }
 
     const response = await this.fetchImpl(url, { headers, signal: AbortSignal.timeout(12_000) });
-    if (!response.ok) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(
-          `[pricing] Home Depot API ${response.status} for ${url.pathname}${url.search}`,
-        );
-      }
+    let payload: unknown;
+    try {
+      payload = (await response.json()) as unknown;
+    } catch {
       return null;
     }
 
-    const payload = (await response.json()) as unknown;
+    if (isApiErrorPayload(payload)) {
+      console.warn(
+        `[pricing] Home Depot API error for ${url.pathname}${url.search}: ${JSON.stringify((payload as Record<string, unknown>).error ?? "unknown")}`,
+      );
+      return null;
+    }
+
+    if (!response.ok) {
+      console.warn(
+        `[pricing] Home Depot API ${response.status} for ${url.pathname}${url.search}`,
+      );
+      return null;
+    }
+
     const price = extractPrice(payload);
     if (!price) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(`[pricing] Home Depot API returned no parseable price for ${url.pathname}`);
-      }
+      console.warn(`[pricing] Home Depot API returned no parseable price for ${url.pathname}`);
       return null;
     }
     return {
@@ -211,6 +266,13 @@ export function resolveHomeDepotClientConfig(env: {
     apiHost: undefined,
     authMode: useOpenWeb ? "openweb" : "rapidapi",
   };
+}
+
+export function isHomeDepotPricingConfigured(env: {
+  HOME_DEPOT_DATA_API_KEY?: string;
+}): boolean {
+  const key = env.HOME_DEPOT_DATA_API_KEY?.trim();
+  return Boolean(key);
 }
 
 export function createHomeDepotRetailClient(env: {

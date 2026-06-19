@@ -13,6 +13,10 @@ describe("health", () => {
     const app = buildTestApp();
     const res = await app.inject({ method: "GET", url: "/health/ready" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ ok: true, database: "skipped" });
+    expect(res.json()).toMatchObject({
+      ok: true,
+      database: "skipped",
+      pricing: { home_depot_key_configured: false, bls_key_configured: false },
+    });
   });
 });
