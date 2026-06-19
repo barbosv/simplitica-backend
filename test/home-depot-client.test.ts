@@ -119,8 +119,9 @@ describe("home-depot-client", () => {
       baseUrl: "https://api.openwebninja.com/realtime-homedepot-data",
       authMode: "openweb",
       fetchImpl: async (url) => {
-        requested.push(url.pathname);
-        if (url.pathname.endsWith("/product-details")) {
+        const path = new URL(url instanceof URL ? url : String(url)).pathname;
+        requested.push(path);
+        if (path.endsWith("/product-details")) {
           return new Response(
             JSON.stringify({ status: "ERROR", error: { message: "no product", code: 502 } }),
             { status: 502, headers: { "Content-Type": "application/json" } },

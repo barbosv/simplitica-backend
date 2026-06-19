@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# Smoke test for /v1/pricing/materials (loads .env if present).
-set -eu
+# Smoke-test pricing endpoints the same way the iOS app calls them.
+# Usage: ./scripts/smoke-pricing.sh [base_url]
+set -euo pipefail
 
-cd "$(dirname "$0")/.."
-PORT="${PORT:-3099}"
-BASE_URL="${BASE_URL:-http://localhost:${PORT}}"
+BASE="${1:-https://simpli-invoice.simplitica.co}"
+BASE="${BASE%/}"
 
-if [ -f .env ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-fi
+echo "==> GET $BASE/health/ready"
+curl -fsS "$BASE/health/ready" | python3 -m json.tool
+echo
 
-echo "POST ${BASE_URL}/v1/pricing/materials"
-curl -s -X POST "${BASE_URL}/v1/pricing/materials" \
+echo "==> POST $BASE/v1/pricing/wages"
+curl -fsS -X POST "$BASE/v1/pricing/wages" \
   -H 'Content-Type: application/json' \
-  -d '{"materials":["faucet","supply_lines"],"zip_code":"30075","quantity":1}' | python3 -m json.tool
+  -H 'Accept: application/json' \
+  -d '{"soc_code":"47-2031","state_code":"GA","fallback":24}' | python3 -m json.tool
+echo
+
+echo "==> POST $BASE/v1/pricing/materials"
+curl -fsS -X POST "$BASE/v1/pricing/materials" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -d '{"materials":["flooring","underlayment","supplies"],"quantity":1000,"zip_code":"30309","region_hint":"Atlanta, GA"}' | python3 -m json.tool

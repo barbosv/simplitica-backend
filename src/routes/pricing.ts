@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Env } from "../env.js";
-import { BLSWageService, isBLSWageConfigured } from "../pricing/bls-wage-service.js";
+import { BLSWageService } from "../pricing/bls-wage-service.js";
 import { createHomeDepotRetailClient, isHomeDepotPricingConfigured } from "../pricing/home-depot-client.js";
 import { MaterialsPricingService } from "../pricing/materials-service.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
