@@ -1,5 +1,3 @@
-import { agentDebugLog } from "./agent-debug-log.js";
-
 export type RetailProductQuote = {
   price: number;
   name: string;
@@ -224,47 +222,15 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
       headers["x-api-key"] = this.apiKey!;
     }
 
-    let response: Response;
-    try {
-      response = await this.fetchImpl(url, { headers, signal: AbortSignal.timeout(12_000) });
-    } catch (err) {
-      agentDebugLog({
-        location: "home-depot-client.ts:request",
-        message: "Home Depot fetch failed",
-        hypothesisId: "C",
-        data: { path: url.pathname, error: String(err) },
-      });
-      return null;
-    }
-
+    const response = await this.fetchImpl(url, { headers, signal: AbortSignal.timeout(12_000) });
     let payload: unknown;
     try {
       payload = (await response.json()) as unknown;
     } catch {
-      agentDebugLog({
-        location: "home-depot-client.ts:request",
-        message: "Home Depot JSON parse failed",
-        hypothesisId: "D",
-        data: { path: url.pathname, status: response.status },
-      });
       return null;
     }
 
-    const errorPayload = isApiErrorPayload(payload);
-    const price = extractPrice(payload);
-    agentDebugLog({
-      location: "home-depot-client.ts:request",
-      message: "Home Depot API response",
-      hypothesisId: errorPayload ? "A" : price ? "B" : "D",
-      data: {
-        path: url.pathname,
-        status: response.status,
-        errorPayload,
-        parsedPrice: price ?? null,
-      },
-    });
-
-    if (errorPayload) {
+    if (isApiErrorPayload(payload)) {
       console.warn(
         `[pricing] Home Depot API error for ${url.pathname}${url.search}: ${JSON.stringify((payload as Record<string, unknown>).error ?? "unknown")}`,
       );
@@ -278,6 +244,7 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
       return null;
     }
 
+    const price = extractPrice(payload);
     if (!price) {
       console.warn(`[pricing] Home Depot API returned no parseable price for ${url.pathname}`);
       return null;

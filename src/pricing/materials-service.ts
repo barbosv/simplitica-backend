@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RetailPriceProvider } from "./home-depot-client.js";
-import { agentDebugLog } from "./agent-debug-log.js";
 import { PricingCache, type CachedMaterialQuote } from "./pricing-cache.js";
 
 export type MaterialCatalogEntry = {
@@ -90,47 +89,14 @@ export class MaterialsPricingService {
       if (entry.default_item_id) {
         attemptedLiveLookup = true;
         quote = await this.provider.getProductById(entry.default_item_id, zipCode);
-        agentDebugLog({
-          location: "materials-service.ts:priceForMaterial",
-          message: "OpenWeb product-details lookup",
-          hypothesisId: "B",
-          data: {
-            materialKey,
-            itemId: entry.default_item_id,
-            hit: Boolean(quote),
-            price: quote?.price ?? null,
-          },
-        });
       }
       if (!quote) {
         attemptedLiveLookup = true;
         quote = await this.provider.lookupItem(entry.search_query, zipCode);
-        agentDebugLog({
-          location: "materials-service.ts:priceForMaterial",
-          message: "OpenWeb item-lookup fallback",
-          hypothesisId: "A",
-          data: {
-            materialKey,
-            query: entry.search_query,
-            hit: Boolean(quote),
-            price: quote?.price ?? null,
-          },
-        });
       }
       if (!quote) {
         attemptedLiveLookup = true;
         quote = await this.provider.searchProduct(entry.search_query, zipCode);
-        agentDebugLog({
-          location: "materials-service.ts:priceForMaterial",
-          message: "OpenWeb search fallback",
-          hypothesisId: "A",
-          data: {
-            materialKey,
-            query: entry.search_query,
-            hit: Boolean(quote),
-            price: quote?.price ?? null,
-          },
-        });
       }
     }
 
