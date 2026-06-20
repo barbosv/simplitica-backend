@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RetailPriceProvider } from "./home-depot-client.js";
 import { agentDebugLog } from "./agent-debug-log.js";
-import { PricingCache } from "./pricing-cache.js";
+import { PricingCache, type CachedMaterialQuote } from "./pricing-cache.js";
 
 export type MaterialCatalogEntry = {
   search_query: string;
@@ -33,12 +33,12 @@ const materialCatalog = JSON.parse(
 export class MaterialsPricingService {
   private readonly provider: RetailPriceProvider;
   private readonly liveLookupAvailable: boolean;
-  private readonly cache: PricingCache;
+  private readonly cache: PricingCache<CachedMaterialQuote>;
 
   constructor(
     provider: RetailPriceProvider,
     liveLookupAvailable: boolean,
-    cache = new PricingCache(),
+    cache = new PricingCache<CachedMaterialQuote>(),
   ) {
     this.provider = provider;
     this.liveLookupAvailable = liveLookupAvailable;

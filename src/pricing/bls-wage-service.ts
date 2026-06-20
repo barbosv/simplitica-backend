@@ -92,16 +92,16 @@ export function lookupIssue(payload: BlsPayload): WageLookupResponse["lookup_iss
 
 export class BLSWageService {
   private readonly apiKey?: string;
-  private readonly cache: PricingCache;
+  private readonly cache: PricingCache<number>;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: {
     apiKey?: string;
-    cache?: PricingCache;
+    cache?: PricingCache<number>;
     fetchImpl?: typeof fetch;
   }) {
     this.apiKey = options.apiKey?.trim() || undefined;
-    this.cache = options.cache ?? new PricingCache(7 * 24 * 60 * 60 * 1000);
+    this.cache = options.cache ?? new PricingCache<number>(7 * 24 * 60 * 60 * 1000);
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 

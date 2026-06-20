@@ -4,15 +4,15 @@ export type CachedMaterialQuote = {
   attemptedLiveLookup: boolean;
 };
 
-export class PricingCache {
+export class PricingCache<T> {
   private readonly ttlMs: number;
-  private readonly entries = new Map<string, { value: CachedMaterialQuote; expiresAt: number }>();
+  private readonly entries = new Map<string, { value: T; expiresAt: number }>();
 
   constructor(ttlMs = 24 * 60 * 60 * 1000) {
     this.ttlMs = ttlMs;
   }
 
-  get(key: string): CachedMaterialQuote | undefined {
+  get(key: string): T | undefined {
     const entry = this.entries.get(key);
     if (!entry) return undefined;
     if (entry.expiresAt <= Date.now()) {
@@ -22,7 +22,7 @@ export class PricingCache {
     return entry.value;
   }
 
-  set(key: string, value: CachedMaterialQuote): void {
+  set(key: string, value: T): void {
     this.entries.set(key, { value, expiresAt: Date.now() + this.ttlMs });
   }
 }
