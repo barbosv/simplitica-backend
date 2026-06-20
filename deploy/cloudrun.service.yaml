@@ -52,6 +52,11 @@ spec:
                 secretKeyRef:
                   name: HOME_DEPOT_DATA_API_KEY
                   key: latest
+            - name: RETAILERAPI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: RETAILERAPI_KEY
+                  key: latest
           startupProbe:
             httpGet:
               path: /health/ready

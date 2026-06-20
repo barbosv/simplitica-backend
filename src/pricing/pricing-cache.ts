@@ -22,7 +22,7 @@ export class PricingCache<T> {
     return entry.value;
   }
 
-  set(key: string, value: T): void {
-    this.entries.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+  set(key: string, value: T, ttlMs = this.ttlMs): void {
+    this.entries.set(key, { value, expiresAt: Date.now() + ttlMs });
   }
 }

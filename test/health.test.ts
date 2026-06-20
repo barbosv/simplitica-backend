@@ -16,7 +16,7 @@ describe("health", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       database: "skipped",
-      pricing: { home_depot_key_configured: false, bls_key_configured: false },
+      pricing: { home_depot_key_configured: false, retailerapi_key_configured: false, bls_key_configured: false },
     });
   });
 });

@@ -55,12 +55,13 @@ Create secrets (never commit values):
 | `STRIPE_WEBHOOK_SECRET` | **Platform** test webhook `whsec_...` |
 | `STRIPE_SECRET_KEY_LIVE` | Platform live secret (when going live) |
 | `STRIPE_WEBHOOK_SECRET_LIVE` | Platform live webhook secret |
-| `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing |
+| `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing (fallback provider) |
+| `RETAILERAPI_KEY` | RetailerAPI key (`rk_live_...`) for live material pricing (primary provider). Create: `./scripts/set-retailerapi-secret.sh` |
 | `SIMPLITICA_CLIENT_API_KEY` | Shared secret for iOS app (`X-API-Key` on `/v1/pricing/*`). Create before deploy: `./scripts/set-client-api-key-secret.sh` |
 
 Optional Apple / app secrets if not using plain env vars.
 
-With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts it via `--set-secrets`.
+With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. For RetailerAPI, run `./scripts/set-retailerapi-secret.sh rk_live_...`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts both via `--set-secrets`.
 
 **After adding the secret**, redeploy Cloud Run so `/v1/pricing/materials` is available (route ships with simplitica-backend main).
 

@@ -26,6 +26,9 @@ export type MaterialsPricingResponse = {
   live_lookup_attempted: boolean;
 };
 
+const LIVE_PRICE_CACHE_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_CACHE_MS = 5 * 60 * 1000;
+
 const materialCatalog = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), "material_catalog.json"), "utf8"),
 ) as Record<string, MaterialCatalogEntry>;
@@ -101,7 +104,7 @@ export class MaterialsPricingService {
 
     if (quote) {
       const result = { price: quote.price, live: true, attemptedLiveLookup: true };
-      this.cache.set(cacheKey, result);
+      this.cache.set(cacheKey, result, LIVE_PRICE_CACHE_MS);
       return result;
     }
 
@@ -110,7 +113,8 @@ export class MaterialsPricingService {
       live: false,
       attemptedLiveLookup,
     };
-    this.cache.set(cacheKey, fallback);
+    // Short TTL so intermittent OpenWeb successes are retried soon after upstream 502s.
+    this.cache.set(cacheKey, fallback, FALLBACK_CACHE_MS);
     return fallback;
   }
 }

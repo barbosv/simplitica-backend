@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import { BLSWageService } from "../pricing/bls-wage-service.js";
-import { createHomeDepotRetailClient, isHomeDepotPricingConfigured } from "../pricing/home-depot-client.js";
+import { createRetailPriceProvider, isLiveMaterialsPricingConfigured } from "../pricing/retail-price-provider.js";
 import { MaterialsPricingService } from "../pricing/materials-service.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
 
@@ -30,8 +30,8 @@ const WageRequestSchema = z.object({
 });
 
 export function registerPricingRoutes(app: FastifyInstance, env: Env) {
-  const provider = createHomeDepotRetailClient(env);
-  const liveLookupAvailable = isHomeDepotPricingConfigured(env);
+  const provider = createRetailPriceProvider(env);
+  const liveLookupAvailable = isLiveMaterialsPricingConfigured(env);
   const service = new MaterialsPricingService(provider, liveLookupAvailable);
   const wageService = new BLSWageService({ apiKey: env.BLS_API_KEY });
 
@@ -69,7 +69,7 @@ export function registerPricingRoutes(app: FastifyInstance, env: Env) {
       if (result.source === "catalog_fallback") {
         req.log.warn(
           {
-            homeDepotKeyConfigured: liveLookupAvailable,
+            liveMaterialsConfigured: liveLookupAvailable,
             liveLookupAttempted: result.live_lookup_attempted,
             materials: body.materials,
           },

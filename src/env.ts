@@ -23,6 +23,8 @@ const BaseEnvSchema = z.object({
   HOME_DEPOT_DATA_API_KEY: z.string().optional(),
   HOME_DEPOT_DATA_API_BASE_URL: z.string().url().optional(),
   HOME_DEPOT_DATA_API_HOST: z.string().optional(),
+  RETAILERAPI_KEY: z.string().optional(),
+  RETAILERAPI_BASE_URL: z.string().url().optional(),
   BLS_API_KEY: z.string().optional(),
   /** When set, `/v1/pricing/*` requires matching `X-API-Key` header (iOS app build secret). */
   SIMPLITICA_CLIENT_API_KEY: z.string().optional(),

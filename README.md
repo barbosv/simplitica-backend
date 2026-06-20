@@ -18,15 +18,19 @@ Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `HOME_DEPOT_DATA_API_KEY` | No | OpenWeb Ninja direct key (`ak_...`) or RapidAPI key |
+| `RETAILERAPI_KEY` | No | RetailerAPI key (`rk_live_...`) for live Home Depot product lookups (tried first) |
+| `RETAILERAPI_BASE_URL` | No | Default: `https://api.retailerapi.com/v1` |
+| `HOME_DEPOT_DATA_API_KEY` | No | OpenWeb Ninja direct key (`ak_...`) or RapidAPI key (fallback after RetailerAPI) |
 | `BLS_API_KEY` | No | BLS Public API registration key for cached OEWS wage lookups |
 | `SIMPLITICA_CLIENT_API_KEY` | No | When set, `/v1/pricing/*` requires matching `X-API-Key` header (shared with iOS `Subscription.xcconfig`) |
 | `HOME_DEPOT_DATA_API_BASE_URL` | No | Default: `https://api.openwebninja.com/realtime-homedepot-data` (direct). Set RapidAPI URL if using RapidAPI. |
 | `HOME_DEPOT_DATA_API_HOST` | No | **RapidAPI only** — sets `X-RapidAPI-Host`. Leave unset for OpenWeb direct (`x-api-key` auth). |
 
+Live materials pricing uses a provider chain: **RetailerAPI → OpenWeb Ninja → catalog fallback** (`src/pricing/material_catalog.json`). Configure at least one live key for `source: "home_depot"` responses.
+
 OpenWeb Ninja direct API uses `items_per_page`, `zipcode`, and `store_id` query params (not `limit` / `zip`). When `/search` is unavailable, the client falls back to `/item-lookup`.
 
-Keys starting with `ak_` auto-select OpenWeb direct mode. Without `HOME_DEPOT_DATA_API_KEY`, `/v1/pricing/materials` returns catalog fallback prices from `src/pricing/material_catalog.json`.
+Keys starting with `ak_` auto-select OpenWeb direct mode. Without any live provider key, `/v1/pricing/materials` returns catalog fallback prices only.
 
 ## Quick start
 

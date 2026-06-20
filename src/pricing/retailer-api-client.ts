@@ -1,0 +1,140 @@
+import type { RetailPriceProvider, RetailProductQuote } from "./home-depot-client.js";
+
+const DEFAULT_BASE_URL = "https://api.retailerapi.com/v1";
+const HOME_DEPOT_RETAILER = "homedepot";
+
+type RetailerApiClientOptions = {
+  apiKey?: string;
+  baseUrl?: string;
+  fetchImpl?: typeof fetch;
+};
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return undefined;
+}
+
+export function extractRetailerApiPrice(payload: unknown): number | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const root = payload as Record<string, unknown>;
+  return asNumber(root.current_price ?? root.buybox_price ?? root.price);
+}
+
+export function extractRetailerApiName(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const title = (payload as Record<string, unknown>).title;
+  return typeof title === "string" && title.trim() ? title.trim() : undefined;
+}
+
+function resolveIdentifier(itemId: string, productUrl?: string): string {
+  const url = productUrl?.trim();
+  if (url && url.includes("homedepot.com")) return url;
+  return itemId.trim();
+}
+
+export class RetailerApiRetailClient implements RetailPriceProvider {
+  private readonly apiKey?: string;
+  private readonly baseUrl: string;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(options: RetailerApiClientOptions) {
+    this.apiKey = options.apiKey?.trim() || undefined;
+    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+    this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  async searchProduct(_query: string, _zipCode?: string): Promise<RetailProductQuote | null> {
+    return null;
+  }
+
+  async lookupItem(_search: string, _zipCode?: string): Promise<RetailProductQuote | null> {
+    return null;
+  }
+
+  async getProductById(
+    itemId: string,
+    _zipCode?: string,
+    productUrl?: string,
+  ): Promise<RetailProductQuote | null> {
+    if (!this.apiKey) return null;
+
+    const identifier = resolveIdentifier(itemId, productUrl);
+    if (!identifier) return null;
+
+    const path = `/products/${encodeURIComponent(identifier)}`;
+    const url = new URL(`${this.baseUrl}${path}`);
+    url.searchParams.set("retailer", HOME_DEPOT_RETAILER);
+
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      Authorization: `Bearer ${this.apiKey}`,
+    };
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        headers,
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch (err) {
+      console.warn(`[pricing] RetailerAPI request failed for ${path}: ${String(err)}`);
+      return null;
+    }
+
+    let payload: unknown;
+    try {
+      payload = (await response.json()) as unknown;
+    } catch {
+      console.warn(`[pricing] RetailerAPI invalid JSON for ${path}`);
+      return null;
+    }
+
+    if (response.status === 404) {
+      console.warn(`[pricing] RetailerAPI product not found for ${path}`);
+      return null;
+    }
+
+    if (response.status === 429) {
+      console.warn(`[pricing] RetailerAPI rate limited for ${path}`);
+      return null;
+    }
+
+    if (!response.ok) {
+      console.warn(`[pricing] RetailerAPI ${response.status} for ${path}`);
+      return null;
+    }
+
+    const price = extractRetailerApiPrice(payload);
+    if (!price) {
+      const root = payload as Record<string, unknown>;
+      console.warn(
+        `[pricing] RetailerAPI returned no parseable price for ${path} ` +
+          `(keys=${Object.keys(root).join(",")})`,
+      );
+      return null;
+    }
+
+    return {
+      price,
+      name: extractRetailerApiName(payload) ?? "Home Depot item",
+    };
+  }
+}
+
+export function isRetailerApiConfigured(env: { RETAILERAPI_KEY?: string }): boolean {
+  return Boolean(env.RETAILERAPI_KEY?.trim());
+}
+
+export function createRetailerApiClient(env: {
+  RETAILERAPI_KEY?: string;
+  RETAILERAPI_BASE_URL?: string;
+}): RetailPriceProvider {
+  return new RetailerApiRetailClient({
+    apiKey: env.RETAILERAPI_KEY,
+    baseUrl: env.RETAILERAPI_BASE_URL,
+  });
+}
