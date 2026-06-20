@@ -122,10 +122,9 @@ export class RetailerApiRetailClient implements RetailPriceProvider {
       return null;
     }
 
+    const rawText = await response.text();
     let payload: unknown;
-    let rawText = "";
     try {
-      rawText = await response.text();
       payload = rawText ? (JSON.parse(rawText) as unknown) : undefined;
     } catch {
       console.warn(`[pricing] RetailerAPI invalid JSON for ${path}`);
