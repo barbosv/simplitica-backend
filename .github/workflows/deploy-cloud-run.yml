@@ -90,6 +90,51 @@ jobs:
         env:
           IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/simplitica-backend:${{ github.sha }}
         run: |
+          REQUIRED_SECRETS=(
+            DATABASE_URL=DATABASE_URL:latest
+            STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest
+            STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest
+            STRIPE_SECRET_KEY_LIVE=STRIPE_SECRET_KEY_LIVE:latest
+            STRIPE_WEBHOOK_SECRET_LIVE=STRIPE_WEBHOOK_SECRET_LIVE:latest
+            HOME_DEPOT_DATA_API_KEY=HOME_DEPOT_DATA_API_KEY:latest
+            RETAILERAPI_KEY=RETAILERAPI_KEY:latest
+            BLS_API_KEY=BLS_API_KEY:latest
+            SIMPLITICA_CLIENT_API_KEY=SIMPLITICA_CLIENT_API_KEY:latest
+          )
+          OPTIONAL_SECRETS=(
+            OPENAI_API_KEY=OPENAI_API_KEY:latest
+            SIMPLILIST_BACKEND_API_KEY=SIMPLILIST_BACKEND_API_KEY:latest
+          )
+
+          SECRETS_LIST=""
+          append_secret() {
+            if [ -z "$SECRETS_LIST" ]; then
+              SECRETS_LIST="$1"
+            else
+              SECRETS_LIST="${SECRETS_LIST},$1"
+            fi
+          }
+
+          for entry in "${REQUIRED_SECRETS[@]}"; do
+            secret_id="${entry%%=*}"
+            if gcloud secrets describe "$secret_id" --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
+              append_secret "$entry"
+            else
+              echo "Required secret $secret_id not found in Secret Manager."
+              exit 1
+            fi
+          done
+
+          for entry in "${OPTIONAL_SECRETS[@]}"; do
+            secret_id="${entry%%=*}"
+            if gcloud secrets describe "$secret_id" --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
+              append_secret "$entry"
+              echo "Mounting optional secret $secret_id"
+            else
+              echo "Optional secret $secret_id not found — skipping (SimpliList routes stay off until created)"
+            fi
+          done
+
           DEPLOY_ARGS=(
             "${{ env.CLOUD_RUN_SERVICE }}"
             --image="$IMAGE"
@@ -103,7 +148,7 @@ jobs:
             --timeout=60
             --cpu-boost
             --add-cloudsql-instances="${{ env.GCP_CLOUD_SQL_INSTANCE }}"
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,STRIPE_SECRET_KEY_LIVE=STRIPE_SECRET_KEY_LIVE:latest,STRIPE_WEBHOOK_SECRET_LIVE=STRIPE_WEBHOOK_SECRET_LIVE:latest,HOME_DEPOT_DATA_API_KEY=HOME_DEPOT_DATA_API_KEY:latest,RETAILERAPI_KEY=RETAILERAPI_KEY:latest,BLS_API_KEY=BLS_API_KEY:latest,SIMPLITICA_CLIENT_API_KEY=SIMPLITICA_CLIENT_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,SIMPLILIST_BACKEND_API_KEY=SIMPLILIST_BACKEND_API_KEY:latest
+            --set-secrets="$SECRETS_LIST"
           )
           ENV_VARS="NODE_ENV=production,STORAGE_BACKEND=postgres,RUN_MIGRATIONS=true,STRIPE_MODE=${{ env.STRIPE_MODE }},APPLE_ENVIRONMENT=${{ env.APPLE_ENVIRONMENT }},STRIPE_CONNECT_RETURN_URL=${{ env.STRIPE_CONNECT_RETURN_URL }},STRIPE_CONNECT_REFRESH_URL=${{ env.STRIPE_CONNECT_REFRESH_URL }},STRIPE_PLATFORM_COUNTRY=${{ env.STRIPE_PLATFORM_COUNTRY }},SIMPLI_INVOICE_BUNDLE_ID=${{ env.SIMPLI_INVOICE_BUNDLE_ID }}"
           if [ -n "${{ env.SIMPLI_INVOICE_APP_APPLE_ID }}" ]; then

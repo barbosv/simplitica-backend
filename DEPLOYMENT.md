@@ -63,7 +63,7 @@ Create secrets (never commit values):
 
 Optional Apple / app secrets if not using plain env vars.
 
-With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. For RetailerAPI, run `./scripts/set-retailerapi-secret.sh rk_live_...`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts both via `--set-secrets`.
+With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. For RetailerAPI, run `./scripts/set-retailerapi-secret.sh rk_live_...`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts required secrets and **optionally** mounts `OPENAI_API_KEY` / `SIMPLILIST_BACKEND_API_KEY` only when those secrets exist (deploy succeeds without them; SimpliList routes stay off until you create the secrets and redeploy).
 
 **After adding the secret**, redeploy Cloud Run so `/v1/pricing/materials` is available (route ships with simplitica-backend main).
 
@@ -110,7 +110,8 @@ When `SIMPLILIST_BACKEND_API_KEY` is set, SimpliList routes are enabled. The iOS
 # 1. Generate + store in GCP (prints key for Info.plist)
 ./scripts/set-simplilist-backend-api-key-secret.sh
 
-# 2. Store OPENAI_API_KEY in Secret Manager (same pattern as other secrets)
+# 2. Store OpenAI key in Secret Manager
+./scripts/set-openai-api-key-secret.sh sk-...
 
 # 3. PantrySync/Info.plist (release build)
 #    SimpliListBackendBaseURL = https://<cloud-run-url>
