@@ -16,7 +16,17 @@ describe("health", () => {
     expect(res.json()).toMatchObject({
       ok: true,
       database: "skipped",
-      pricing: { home_depot_key_configured: false, retailerapi_key_configured: false, bls_key_configured: false },
+      pricing: {
+        home_depot_key_configured: false,
+        retailerapi_key_configured: false,
+        bls_key_configured: false,
+        client_api_key_required: false,
+      },
+      simplilist: {
+        backend_api_key_configured: false,
+        openai_key_configured: false,
+        apple_iap_lookup_configured: false,
+      },
     });
   });
 });

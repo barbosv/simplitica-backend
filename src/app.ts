@@ -11,6 +11,8 @@ import { registerStripeConnectLandingRoutes } from "./routes/stripe-connect-land
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook.js";
 import { registerPricingRoutes } from "./routes/pricing.js";
 import { createClientApiKeyHook } from "./middleware/client-api-key.js";
+import { registerSimplilistRoutes } from "./routes/simplilist.js";
+import { isSimplilistBackendConfigured } from "./simplilist/auth.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -85,6 +87,15 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
     });
     registerPricingRoutes(scoped, env);
   });
+
+  if (isSimplilistBackendConfigured(env)) {
+    void app.register(
+      async (scoped) => {
+        await registerSimplilistRoutes(scoped, env, ctx);
+      },
+      { bodyLimit: 12 * 1024 * 1024 },
+    );
+  }
 
   return app;
 }

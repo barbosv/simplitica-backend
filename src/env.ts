@@ -28,6 +28,21 @@ const BaseEnvSchema = z.object({
   BLS_API_KEY: z.string().optional(),
   /** When set, `/v1/pricing/*` requires matching `X-API-Key` header (iOS app build secret). */
   SIMPLITICA_CLIENT_API_KEY: z.string().optional(),
+  /** SimpliList hosted backend: Bearer token (maps to SimpliListBackendAPIKey in Info.plist). */
+  SIMPLILIST_BACKEND_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  SIMPLILIST_BUNDLE_ID: z.string().default("co.simplitica.simplilist"),
+  SIMPLILIST_PRO_PRODUCT_IDS: z
+    .string()
+    .default("co.simplitica.simplilist.pro.monthly,co.simplitica.simplilist.pro.yearly"),
+  SIMPLILIST_APPLE_SANDBOX: z.coerce.boolean().default(false),
+  APPLE_ISSUER_ID: z.string().optional(),
+  APPLE_KEY_ID: z.string().optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
+  SIMPLILIST_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  SIMPLILIST_AI_DAILY_CAP_PER_DEVICE: z.coerce.number().int().positive().default(200),
+  PUBLIX_DEALS_CACHE_MS: z.coerce.number().int().positive().default(6 * 60 * 60 * 1000),
+  PUBLIX_DEALS_FIXTURE: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof BaseEnvSchema>;

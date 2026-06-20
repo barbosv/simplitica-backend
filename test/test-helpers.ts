@@ -21,6 +21,19 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     STRIPE_CONNECT_REFRESH_URL: undefined,
     STRIPE_PLATFORM_COUNTRY: "US",
     CORS_ORIGIN: undefined,
+    SIMPLILIST_BACKEND_API_KEY: undefined,
+    OPENAI_API_KEY: undefined,
+    SIMPLILIST_BUNDLE_ID: "co.simplitica.simplilist",
+    SIMPLILIST_PRO_PRODUCT_IDS:
+      "co.simplitica.simplilist.pro.monthly,co.simplitica.simplilist.pro.yearly",
+    SIMPLILIST_APPLE_SANDBOX: false,
+    APPLE_ISSUER_ID: undefined,
+    APPLE_KEY_ID: undefined,
+    APPLE_PRIVATE_KEY: undefined,
+    SIMPLILIST_RATE_LIMIT_PER_MINUTE: 60,
+    SIMPLILIST_AI_DAILY_CAP_PER_DEVICE: 200,
+    PUBLIX_DEALS_CACHE_MS: 6 * 60 * 60 * 1000,
+    PUBLIX_DEALS_FIXTURE: false,
     ...overrides,
   };
 }

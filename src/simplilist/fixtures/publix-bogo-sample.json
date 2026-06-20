@@ -1,0 +1,63 @@
+{
+  "storeNumber": "628",
+  "validFrom": "2026-06-19",
+  "validThrough": "2026-06-25",
+  "source": "fixture",
+  "deals": [
+    {
+      "id": "fixture-kelloggs-cereal",
+      "title": "Kellogg's Cereal",
+      "description": "Selected varieties",
+      "savings": "3.99",
+      "department": "Grocery",
+      "brand": "Kellogg's",
+      "imageURL": null,
+      "promoText": "Buy One Get One Free",
+      "validThrough": "2026-06-25"
+    },
+    {
+      "id": "fixture-chobani-yogurt",
+      "title": "Chobani Greek Yogurt",
+      "description": "5.3 oz cup",
+      "savings": "1.29",
+      "department": "Dairy",
+      "brand": "Chobani",
+      "imageURL": null,
+      "promoText": "BOGO",
+      "validThrough": "2026-06-25"
+    },
+    {
+      "id": "fixture-berries",
+      "title": "Strawberries",
+      "description": "1 lb package",
+      "savings": "2.99",
+      "department": "Produce",
+      "brand": "",
+      "imageURL": null,
+      "promoText": "Buy One Get One Free",
+      "validThrough": "2026-06-25"
+    },
+    {
+      "id": "fixture-chicken",
+      "title": "Publix Boneless Chicken Breasts",
+      "description": "Fresh, per package",
+      "savings": "4.99",
+      "department": "Meat",
+      "brand": "Publix",
+      "imageURL": null,
+      "promoText": "Buy 1 Get 1 Free",
+      "validThrough": "2026-06-25"
+    },
+    {
+      "id": "fixture-lays",
+      "title": "Lay's Potato Chips",
+      "description": "7.75–10 oz bag",
+      "savings": "2.49",
+      "department": "Grocery",
+      "brand": "Lay's",
+      "imageURL": null,
+      "promoText": "BOGO",
+      "validThrough": "2026-06-25"
+    }
+  ]
+}

@@ -23,6 +23,7 @@ export async function createAppContext(env: Env, opts?: { runMigrations?: boolea
         businesses: memory.businesses,
         invoicePayments: memory.invoicePayments,
         stripeEvents: memory.stripeEvents,
+        simplilistDeviceEntitlements: memory.simplilistDeviceEntitlements,
       },
       databaseUrl: null,
     };

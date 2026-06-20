@@ -1,4 +1,10 @@
-import type { BusinessRecord, InvoicePaymentRecord, Repositories, SubscriptionRecord } from "../types.js";
+import type {
+  BusinessRecord,
+  InvoicePaymentRecord,
+  Repositories,
+  SimplilistDeviceEntitlementRecord,
+  SubscriptionRecord,
+} from "../types.js";
 
 export function createMemoryRepositories(): Repositories {
   const subscriptions: SubscriptionRecord[] = [];
@@ -6,6 +12,7 @@ export function createMemoryRepositories(): Repositories {
   const invoicePayments = new Map<string, InvoicePaymentRecord>();
   const invoiceByIdempotency = new Map<string, InvoicePaymentRecord>();
   const stripeEvents = new Set<string>();
+  const simplilistDeviceEntitlements = new Map<string, SimplilistDeviceEntitlementRecord>();
 
   const invoiceKey = (businessId: string, invoiceId: string) => `${businessId}:${invoiceId}`;
 
@@ -136,6 +143,24 @@ export function createMemoryRepositories(): Repositories {
         if (stripeEvents.has(eventId)) return false;
         stripeEvents.add(eventId);
         return true;
+      },
+    },
+
+    simplilistDeviceEntitlements: {
+      async get(deviceId) {
+        return simplilistDeviceEntitlements.get(deviceId) ?? null;
+      },
+
+      async upsert({ deviceId, pro, originalTransactionId }) {
+        const updatedAt = new Date().toISOString();
+        const record: SimplilistDeviceEntitlementRecord = {
+          deviceId,
+          pro,
+          originalTransactionId,
+          updatedAt,
+        };
+        simplilistDeviceEntitlements.set(deviceId, record);
+        return record;
       },
     },
   };

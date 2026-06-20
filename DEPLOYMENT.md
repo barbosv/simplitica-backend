@@ -58,6 +58,8 @@ Create secrets (never commit values):
 | `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing (fallback provider) |
 | `RETAILERAPI_KEY` | RetailerAPI key (`rk_live_...`) for live material pricing (primary provider). Create: `./scripts/set-retailerapi-secret.sh` |
 | `SIMPLITICA_CLIENT_API_KEY` | Shared secret for iOS app (`X-API-Key` on `/v1/pricing/*`). Create before deploy: `./scripts/set-client-api-key-secret.sh` |
+| `SIMPLILIST_BACKEND_API_KEY` | Shared secret for SimpliList (`Authorization: Bearer` on `/v1/ai/*`, `/v1/iap/register`, `/v1/deals/publix/*`) |
+| `OPENAI_API_KEY` | OpenAI key for SimpliList hosted AI proxy |
 
 Optional Apple / app secrets if not using plain env vars.
 
@@ -94,6 +96,32 @@ Smoke test with auth:
 ```bash
 SIMPLITICA_CLIENT_API_KEY=your-key ./scripts/smoke-pricing.sh
 ```
+
+### SimpliList hosted backend
+
+When `SIMPLILIST_BACKEND_API_KEY` is set, SimpliList routes are enabled. The iOS app sends:
+
+- `Authorization: Bearer <SIMPLILIST_BACKEND_API_KEY>`
+- `X-Device-Id: <stable device UUID>`
+
+**Rollout**
+
+```bash
+# 1. Generate + store in GCP (prints key for Info.plist)
+./scripts/set-simplilist-backend-api-key-secret.sh
+
+# 2. Store OPENAI_API_KEY in Secret Manager (same pattern as other secrets)
+
+# 3. PantrySync/Info.plist (release build)
+#    SimpliListBackendBaseURL = https://<cloud-run-url>
+#    SimpliListBackendAPIKey = <same hex key>
+
+# 4. Push backend + redeploy Cloud Run
+
+# 5. Rebuild SimpliList
+```
+
+Optional: `PUBLIX_DEALS_FIXTURE=true` for staging when Publix live API is blocked. Device Pro entitlements persist in Cloud SQL table `simplilist_device_entitlements` (migration `002`).
 
 ## Stripe Connect model (platform vs customer)
 

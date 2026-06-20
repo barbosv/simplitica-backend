@@ -277,5 +277,47 @@ export function createPostgresRepositories(pool: pg.Pool): Repositories {
         return (result.rowCount ?? 0) > 0;
       },
     },
+
+    simplilistDeviceEntitlements: {
+      async get(deviceId) {
+        const result = await pool.query(
+          `SELECT device_id, pro, original_transaction_id, updated_at
+           FROM simplilist_device_entitlements WHERE device_id = $1`,
+          [deviceId],
+        );
+        const row = result.rows[0] as Record<string, unknown> | undefined;
+        if (!row) return null;
+        return {
+          deviceId: row.device_id as string,
+          pro: Boolean(row.pro),
+          originalTransactionId: (row.original_transaction_id as string) ?? undefined,
+          updatedAt: new Date(row.updated_at as string).toISOString(),
+        };
+      },
+
+      async upsert({ deviceId, pro, originalTransactionId }) {
+        const updatedAt = new Date().toISOString();
+        const result = await pool.query(
+          `
+          INSERT INTO simplilist_device_entitlements (device_id, pro, original_transaction_id, updated_at)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (device_id)
+          DO UPDATE SET
+            pro = EXCLUDED.pro,
+            original_transaction_id = EXCLUDED.original_transaction_id,
+            updated_at = EXCLUDED.updated_at
+          RETURNING device_id, pro, original_transaction_id, updated_at
+          `,
+          [deviceId, pro, originalTransactionId ?? null, updatedAt],
+        );
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+          deviceId: row.device_id as string,
+          pro: Boolean(row.pro),
+          originalTransactionId: (row.original_transaction_id as string) ?? undefined,
+          updatedAt: new Date(row.updated_at as string).toISOString(),
+        };
+      },
+    },
   };
 }
