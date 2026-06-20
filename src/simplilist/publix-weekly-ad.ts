@@ -366,12 +366,18 @@ export async function fetchBOGOCatalog(
     writeCache(env, storeNumber, payload);
     return payload;
   } catch (error) {
-    if (env.NODE_ENV !== "production") {
-      const fixture = loadFixtureCatalog(storeNumber);
-      fixture.fallbackReason = String((error as Error)?.message || error);
-      writeCache(env, storeNumber, fixture);
-      return fixture;
+    // A genuinely empty BOGO week from a reachable upstream should surface as
+    // "no deals" rather than be masked by stale sample data.
+    if ((error as { code?: string })?.code === "no_bogo_deals") {
+      throw error;
     }
-    throw error;
+    // Publix's savings API sits behind Akamai bot protection and routinely
+    // blocks server-side requests (HTTP 403). Serve the bundled sample catalog
+    // (tagged source:"fixture") so the app still shows deals instead of an
+    // error. Clients can distinguish live vs. sample data via `source`.
+    const fixture = loadFixtureCatalog(storeNumber);
+    fixture.fallbackReason = String((error as Error)?.message || error);
+    writeCache(env, storeNumber, fixture);
+    return fixture;
   }
 }
