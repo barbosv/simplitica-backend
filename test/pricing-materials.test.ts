@@ -63,6 +63,21 @@ describe("pricing materials", () => {
     });
   });
 
+  it("scales flooring materials by square footage using per_sq_ft_proxy", async () => {
+    const provider = new StubRetailProvider({});
+    const service = new MaterialsPricingService(provider, false);
+    const result = await service.quote({
+      materials: ["flooring", "underlayment", "supplies"],
+      quantity: 1000,
+    });
+    expect(result.source).toBe("catalog_fallback");
+    // flooring: 150/20 * 1000 = 7500; underlayment: 40/100 * 1000 = 400; supplies: flat 25
+    expect(result.line_items.flooring).toBe(7500);
+    expect(result.line_items.underlayment).toBe(400);
+    expect(result.line_items.supplies).toBe(25);
+    expect(result.total_cost).toBe(7925);
+  });
+
   it("returns live home depot totals from stub provider", async () => {
     const provider = new StubRetailProvider({
       faucet: 92,

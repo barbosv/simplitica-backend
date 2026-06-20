@@ -14,21 +14,27 @@
   "paint": {
     "search_query": "interior paint gallon",
     "fallback_price": 45,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 350,
     "default_item_id": "200279289"
   },
   "primer": {
     "search_query": "interior primer gallon",
     "fallback_price": 35,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 350,
     "default_item_id": "100047459"
   },
   "supplies": {
     "search_query": "painting supplies kit",
     "fallback_price": 25,
+    "price_mode": "flat_per_job",
     "default_item_id": "203551020"
   },
   "consumables": {
     "search_query": "cleaning supplies bundle",
     "fallback_price": 20,
+    "price_mode": "flat_per_job",
     "default_item_id": "203551020"
   },
   "window_unit": {
@@ -87,22 +93,28 @@
   "plants": {
     "search_query": "landscaping shrubs",
     "fallback_price": 60,
+    "price_mode": "flat_per_job",
     "default_item_id": "203230762"
   },
   "mulch": {
     "search_query": "hardwood mulch 2 cu ft",
     "fallback_price": 40,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 12,
     "default_item_id": "202020230"
   },
   "flooring": {
     "search_query": "hardwood flooring",
     "fallback_price": 150,
     "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 20,
     "default_item_id": "203329477"
   },
   "underlayment": {
     "search_query": "flooring underlayment roll",
     "fallback_price": 40,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 100,
     "default_item_id": "100072386"
   },
   "lumber": {
@@ -119,6 +131,8 @@
   "concrete": {
     "search_query": "concrete mix 80 lb bag",
     "fallback_price": 200,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 1.8,
     "default_item_id": "100318511"
   },
   "posts": {
@@ -134,6 +148,8 @@
   "rebar": {
     "search_query": "rebar #4 20 ft",
     "fallback_price": 60,
+    "price_mode": "per_sq_ft_proxy",
+    "coverage_sq_ft": 50,
     "default_item_id": "100321184"
   },
   "disposal": {

@@ -9,7 +9,9 @@ export type MaterialCatalogEntry = {
   fallback_price: number;
   default_item_id?: string | null;
   default_product_url?: string | null;
-  price_mode?: "per_sq_ft_proxy";
+  /** Retail unit covers this many square feet before scaling by request quantity. */
+  price_mode?: "per_sq_ft_proxy" | "flat_per_job";
+  coverage_sq_ft?: number;
 };
 
 export type MaterialsPricingRequest = {
@@ -56,8 +58,11 @@ export class MaterialsPricingService {
     let attemptedLiveLookup = false;
 
     for (const key of request.materials) {
+      const entry = materialCatalog[key];
       const priced = await this.priceForMaterial(key, zip);
-      lineItems[key] = roundMoney(priced.price * quantity);
+      lineItems[key] = roundMoney(
+        lineCostForMaterial(entry, priced.price, quantity),
+      );
       if (priced.attemptedLiveLookup) attemptedLiveLookup = true;
       if (priced.live) usedLiveProvider = true;
     }
@@ -117,6 +122,23 @@ export class MaterialsPricingService {
     this.cache.set(cacheKey, fallback, FALLBACK_CACHE_MS);
     return fallback;
   }
+}
+
+function lineCostForMaterial(
+  entry: MaterialCatalogEntry | undefined,
+  unitPrice: number,
+  quantity: number,
+): number {
+  if (!entry) return 0;
+  if (entry.price_mode === "flat_per_job") {
+    return unitPrice;
+  }
+  if (entry.price_mode === "per_sq_ft_proxy") {
+    const coverage = entry.coverage_sq_ft ?? 1;
+    if (coverage <= 0) return unitPrice * quantity;
+    return (unitPrice / coverage) * quantity;
+  }
+  return unitPrice * quantity;
 }
 
 function roundMoney(value: number): number {
