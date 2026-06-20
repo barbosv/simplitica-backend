@@ -6,7 +6,7 @@ const simplilistHeaders = {
   "x-device-id": "device-test-001",
 };
 
-describe("SimpliList routes", () => {
+describe("SimpliList Publix deals routes", () => {
   const app = () =>
     buildTestApp({
       SIMPLILIST_BACKEND_API_KEY: "test-simplilist-key",
@@ -56,55 +56,11 @@ describe("SimpliList routes", () => {
     expect(body.deals.length).toBeGreaterThan(0);
   });
 
-  it("returns 403 for AI without Pro registration", async () => {
-    const res = await app().inject({
-      method: "POST",
-      url: "/v1/ai/voice-items",
-      headers: simplilistHeaders,
-      payload: { transcript: "milk eggs" },
-    });
-    expect(res.statusCode).toBe(403);
-    expect(res.json()).toEqual({ error: "pro_required" });
-  });
-
-  it("returns 400 for iap register without payload", async () => {
-    const res = await app().inject({
-      method: "POST",
-      url: "/v1/iap/register",
-      headers: simplilistHeaders,
-      payload: {},
-    });
-    expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: "transaction_payload_required" });
-  });
-
-  it("registers pro from signed transaction JWS payload", async () => {
-    const header = Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url");
-    const payload = Buffer.from(
-      JSON.stringify({
-        productId: "co.simplitica.simplilist.pro.monthly",
-        originalTransactionId: "orig-123",
-        expiresDate: Date.now() + 60_000,
-      }),
-    ).toString("base64url");
-    const jws = `${header}.${payload}.`;
-
-    const register = await app().inject({
-      method: "POST",
-      url: "/v1/iap/register",
-      headers: simplilistHeaders,
-      payload: { signedTransactionInfos: [jws] },
-    });
-    expect(register.statusCode).toBe(200);
-    expect(register.json()).toMatchObject({ pro: true, originalTransactionId: "orig-123" });
-  });
-
   it("exposes simplilist flags on health/ready", async () => {
     const res = await app().inject({ method: "GET", url: "/health/ready" });
     expect(res.statusCode).toBe(200);
     expect(res.json().simplilist).toMatchObject({
       backend_api_key_configured: true,
-      openai_key_configured: false,
     });
   });
 });

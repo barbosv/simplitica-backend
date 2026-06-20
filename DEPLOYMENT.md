@@ -58,12 +58,11 @@ Create secrets (never commit values):
 | `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing (fallback provider) |
 | `RETAILERAPI_KEY` | RetailerAPI key (`rk_live_...`) for live material pricing (primary provider). Create: `./scripts/set-retailerapi-secret.sh` |
 | `SIMPLITICA_CLIENT_API_KEY` | Shared secret for iOS app (`X-API-Key` on `/v1/pricing/*`). Create before deploy: `./scripts/set-client-api-key-secret.sh` |
-| `SIMPLILIST_BACKEND_API_KEY` | Shared secret for SimpliList (`Authorization: Bearer` on `/v1/ai/*`, `/v1/iap/register`, `/v1/deals/publix/*`) |
-| `OPENAI_API_KEY` | OpenAI key for SimpliList hosted AI proxy |
+| `SIMPLILIST_BACKEND_API_KEY` | Shared secret for SimpliList Publix BOGO proxy (`Authorization: Bearer` on `/v1/deals/publix/*`) |
 
 Optional Apple / app secrets if not using plain env vars.
 
-With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. For RetailerAPI, run `./scripts/set-retailerapi-secret.sh rk_live_...`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts required secrets and **optionally** mounts `OPENAI_API_KEY` / `SIMPLILIST_BACKEND_API_KEY` only when those secrets exist (deploy succeeds without them; SimpliList routes stay off until you create the secrets and redeploy).
+With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. For RetailerAPI, run `./scripts/set-retailerapi-secret.sh rk_live_...`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts required secrets and **optionally** mounts `SIMPLILIST_BACKEND_API_KEY` when that secret exists (deploy succeeds without it; Publix deal routes return `simplilist_not_configured` until you create the secret and redeploy).
 
 **After adding the secret**, redeploy Cloud Run so `/v1/pricing/materials` is available (route ships with simplitica-backend main).
 
@@ -97,9 +96,9 @@ Smoke test with auth:
 SIMPLITICA_CLIENT_API_KEY=your-key ./scripts/smoke-pricing.sh
 ```
 
-### SimpliList hosted backend
+### SimpliList Publix BOGO proxy
 
-When `SIMPLILIST_BACKEND_API_KEY` is set, SimpliList routes are enabled. The iOS app sends:
+When `SIMPLILIST_BACKEND_API_KEY` is set, SimpliList Publix deal routes are enabled. The iOS app sends:
 
 - `Authorization: Bearer <SIMPLILIST_BACKEND_API_KEY>`
 - `X-Device-Id: <stable device UUID>`
@@ -110,19 +109,16 @@ When `SIMPLILIST_BACKEND_API_KEY` is set, SimpliList routes are enabled. The iOS
 # 1. Generate + store in GCP (prints key for Info.plist)
 ./scripts/set-simplilist-backend-api-key-secret.sh
 
-# 2. Store OpenAI key in Secret Manager
-./scripts/set-openai-api-key-secret.sh sk-...
-
-# 3. PantrySync/Info.plist (release build)
+# 2. PantrySync/Info.plist (release build)
 #    SimpliListBackendBaseURL = https://<cloud-run-url>
 #    SimpliListBackendAPIKey = <same hex key>
 
-# 4. Push backend + redeploy Cloud Run
+# 3. Push backend + redeploy Cloud Run
 
-# 5. Rebuild SimpliList
+# 4. Rebuild SimpliList
 ```
 
-Optional: `PUBLIX_DEALS_FIXTURE=true` for staging when Publix live API is blocked. Device Pro entitlements persist in Cloud SQL table `simplilist_device_entitlements` (migration `002`).
+Optional: `PUBLIX_DEALS_FIXTURE=true` for staging when Publix live API is blocked.
 
 ## Stripe Connect model (platform vs customer)
 

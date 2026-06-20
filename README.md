@@ -1,6 +1,6 @@
 # simplitica-backend
 
-Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Apple subscription sync**, **Stripe Connect** invoice payments, and **SimpliList hosted AI + Publix BOGO deals**.
+Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Apple subscription sync**, **Stripe Connect** invoice payments, and **SimpliList Publix BOGO deals proxy**.
 
 ## Features
 
@@ -13,8 +13,6 @@ Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Ap
 - `POST /v1/pricing/wages` — Cached BLS OEWS wage lookups for estimate suggestions (iOS client)
 - **SimpliList** (when `SIMPLILIST_BACKEND_API_KEY` is set):
   - `GET /v1/deals/publix/stores`, `GET /v1/deals/publix/bogo`
-  - `POST /v1/iap/register` — device Pro registration (`Authorization: Bearer` + `X-Device-Id`)
-  - `POST /v1/ai/voice-items`, `POST /v1/ai/grocery-category`, `POST /v1/ai/receipt-line-items`
 
 Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for local subscription-only dev).
 

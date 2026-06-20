@@ -87,12 +87,9 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
     registerPricingRoutes(scoped, env);
   });
 
-  void app.register(
-    async (scoped) => {
-      await registerSimplilistRoutes(scoped, env, ctx);
-    },
-    { bodyLimit: 12 * 1024 * 1024 },
-  );
+  void app.register(async (scoped) => {
+    await registerSimplilistRoutes(scoped, env);
+  });
 
   return app;
 }

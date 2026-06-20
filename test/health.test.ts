@@ -24,8 +24,6 @@ describe("health", () => {
       },
       simplilist: {
         backend_api_key_configured: false,
-        openai_key_configured: false,
-        apple_iap_lookup_configured: false,
       },
     });
   });

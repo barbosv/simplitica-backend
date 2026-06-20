@@ -6,9 +6,7 @@ import { isHomeDepotPricingConfigured } from "../pricing/home-depot-client.js";
 import { isRetailerApiConfigured } from "../pricing/retailer-api-client.js";
 import { isBLSWageConfigured } from "../pricing/bls-wage-service.js";
 import { isClientApiKeyConfigured } from "../middleware/client-api-key.js";
-import { isOpenAIConfigured } from "../simplilist/openai.js";
 import { isSimplilistBackendConfigured } from "../simplilist/auth.js";
-import { isAppleIAPLookupConfigured } from "../simplilist/apple-iap.js";
 
 export async function registerHealthRoutes(app: FastifyInstance, env: Env, ctx: AppContext) {
   app.get("/health", async () => ({ ok: true }));
@@ -22,8 +20,6 @@ export async function registerHealthRoutes(app: FastifyInstance, env: Env, ctx: 
     };
     const simplilist = {
       backend_api_key_configured: isSimplilistBackendConfigured(env),
-      openai_key_configured: isOpenAIConfigured(env),
-      apple_iap_lookup_configured: isAppleIAPLookupConfigured(env),
     };
     if (!ctx.databaseUrl) {
       return { ok: true, database: "skipped", pricing, simplilist };

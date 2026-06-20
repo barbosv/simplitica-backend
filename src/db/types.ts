@@ -50,13 +50,6 @@ export type InvoicePaymentRecord = {
   updatedAt: string;
 };
 
-export type SimplilistDeviceEntitlementRecord = {
-  deviceId: string;
-  pro: boolean;
-  originalTransactionId?: string;
-  updatedAt: string;
-};
-
 export type Repositories = {
   subscriptions: {
     upsert(record: Omit<SubscriptionRecord, "updatedAt">): Promise<SubscriptionRecord>;
@@ -91,13 +84,5 @@ export type Repositories = {
   };
   stripeEvents: {
     tryInsert(eventId: string, type: string): Promise<boolean>;
-  };
-  simplilistDeviceEntitlements: {
-    get(deviceId: string): Promise<SimplilistDeviceEntitlementRecord | null>;
-    upsert(record: {
-      deviceId: string;
-      pro: boolean;
-      originalTransactionId?: string;
-    }): Promise<SimplilistDeviceEntitlementRecord>;
   };
 };
