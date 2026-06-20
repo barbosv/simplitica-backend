@@ -18,7 +18,13 @@ class StubRetailProvider implements RetailPriceProvider {
     return null;
   }
 
-  async getProductById(): Promise<RetailProductQuote | null> {
+  async getProductById(itemId: string): Promise<RetailProductQuote | null> {
+    if (itemId === "100037089") {
+      return { price: this.prices.faucet ?? 92, name: "faucet" };
+    }
+    if (itemId === "205708840") {
+      return { price: this.prices.supply_lines ?? 28, name: "supply_lines" };
+    }
     return null;
   }
 
@@ -100,5 +106,16 @@ describe("pricing materials", () => {
       source: "template_fallback",
       live_lookup_attempted: false,
     });
+  });
+
+  it("ignores empty state_code on wages (treats as national lookup)", async () => {
+    const app = buildTestApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/pricing/wages",
+      payload: { soc_code: "47-2031", state_code: "", fallback: 24 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().source).toBe("template_fallback");
   });
 });

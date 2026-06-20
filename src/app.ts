@@ -10,6 +10,7 @@ import { registerStripeConnectRoutes } from "./routes/stripe-connect.js";
 import { registerStripeConnectLandingRoutes } from "./routes/stripe-connect-landing.js";
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook.js";
 import { registerPricingRoutes } from "./routes/pricing.js";
+import { createClientApiKeyHook } from "./middleware/client-api-key.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -70,7 +71,20 @@ export function buildApp({ env, ctx }: BuildAppOptions) {
   registerStripeConnectLandingRoutes(app);
   void registerSubscriptionRoutes(app, env, ctx);
   void registerStripeWebhookRoutes(app, env, ctx);
-  registerPricingRoutes(app, env);
+
+  void app.register(async (scoped) => {
+    scoped.addHook("onRequest", createClientApiKeyHook(env));
+    await scoped.register(rateLimit, {
+      max: 30,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => {
+        const apiKey = req.headers["x-api-key"];
+        const value = Array.isArray(apiKey) ? apiKey[0] : apiKey;
+        return value ? `pricing:${value}` : `pricing:ip:${req.ip}`;
+      },
+    });
+    registerPricingRoutes(scoped, env);
+  });
 
   return app;
 }

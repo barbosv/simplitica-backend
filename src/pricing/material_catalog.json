@@ -1,119 +1,148 @@
 {
   "faucet": {
     "search_query": "kitchen faucet chrome",
-    "fallback_price": 85
+    "fallback_price": 85,
+    "default_item_id": "100037089"
   },
   "supply_lines": {
     "search_query": "faucet supply lines 2 pack",
-    "fallback_price": 25
+    "fallback_price": 25,
+    "default_item_id": "205708840"
   },
   "paint": {
     "search_query": "interior paint gallon",
-    "fallback_price": 45
+    "fallback_price": 45,
+    "default_item_id": "200279289"
   },
   "primer": {
     "search_query": "interior primer gallon",
-    "fallback_price": 35
+    "fallback_price": 35,
+    "default_item_id": "100047459"
   },
   "supplies": {
     "search_query": "painting supplies kit",
-    "fallback_price": 25
+    "fallback_price": 25,
+    "default_item_id": "203551020"
   },
   "consumables": {
     "search_query": "cleaning supplies bundle",
-    "fallback_price": 20
+    "fallback_price": 20,
+    "default_item_id": "203551020"
   },
   "window_unit": {
     "search_query": "vinyl replacement window",
-    "fallback_price": 250
+    "fallback_price": 250,
+    "default_item_id": "306643885"
   },
   "flashing": {
     "search_query": "roof flashing roll",
-    "fallback_price": 45
+    "fallback_price": 45,
+    "default_item_id": "202091965"
   },
   "caulk": {
     "search_query": "exterior caulk tube",
-    "fallback_price": 12
+    "fallback_price": 12,
+    "default_item_id": "202077564"
   },
   "shingles": {
     "search_query": "architectural shingles bundle",
-    "fallback_price": 120
+    "fallback_price": 120,
+    "default_item_id": "202172264"
   },
   "drywall": {
     "search_query": "drywall sheet 4x8",
-    "fallback_price": 35
+    "fallback_price": 35,
+    "default_item_id": "202106444"
   },
   "mud": {
     "search_query": "joint compound bucket",
-    "fallback_price": 20
+    "fallback_price": 20,
+    "default_item_id": "202094020"
   },
   "wire": {
     "search_query": "12 gauge electrical wire",
-    "fallback_price": 40
+    "fallback_price": 40,
+    "default_item_id": "202311546"
   },
   "devices": {
     "search_query": "electrical outlet receptacle",
-    "fallback_price": 35
+    "fallback_price": 35,
+    "default_item_id": "203547512"
   },
   "parts": {
     "search_query": "HVAC repair parts kit",
-    "fallback_price": 85
+    "fallback_price": 85,
+    "default_item_id": "100545278"
   },
   "refrigerant": {
     "search_query": "HVAC refrigerant r410a",
-    "fallback_price": 45
+    "fallback_price": 45,
+    "default_item_id": "202255571"
   },
   "plants": {
     "search_query": "landscaping shrubs",
-    "fallback_price": 60
+    "fallback_price": 60,
+    "default_item_id": "203230762"
   },
   "mulch": {
     "search_query": "hardwood mulch 2 cu ft",
-    "fallback_price": 40
+    "fallback_price": 40,
+    "default_item_id": "202020230"
   },
   "flooring": {
     "search_query": "hardwood flooring",
     "fallback_price": 150,
-    "price_mode": "per_sq_ft_proxy"
+    "price_mode": "per_sq_ft_proxy",
+    "default_item_id": "203329477"
   },
   "underlayment": {
     "search_query": "flooring underlayment roll",
-    "fallback_price": 40
+    "fallback_price": 40,
+    "default_item_id": "100072386"
   },
   "lumber": {
     "search_query": "pressure treated lumber 2x4",
-    "fallback_price": 400
+    "fallback_price": 400,
+    "default_item_id": "100321184"
   },
   "hardware": {
     "search_query": "deck hardware kit",
-    "fallback_price": 80
+    "fallback_price": 80,
+    "default_item_id": "202091965"
   },
   "concrete": {
     "search_query": "concrete mix 80 lb bag",
-    "fallback_price": 200
+    "fallback_price": 200,
+    "default_item_id": "100318511"
   },
   "posts": {
     "search_query": "fence posts 4x4",
-    "fallback_price": 120
+    "fallback_price": 120,
+    "default_item_id": "100321184"
   },
   "panels": {
     "search_query": "privacy fence panels",
-    "fallback_price": 280
+    "fallback_price": 280,
+    "default_item_id": "203066949"
   },
   "rebar": {
     "search_query": "rebar #4 20 ft",
-    "fallback_price": 60
+    "fallback_price": 60,
+    "default_item_id": "100321184"
   },
   "disposal": {
     "search_query": "construction debris bag",
-    "fallback_price": 150
+    "fallback_price": 150,
+    "default_item_id": "202973778"
   },
   "gutter_parts": {
     "search_query": "gutter section 10 ft",
-    "fallback_price": 55
+    "fallback_price": 55,
+    "default_item_id": "100080603"
   },
   "sealant": {
     "search_query": "gutter sealant",
-    "fallback_price": 15
+    "fallback_price": 15,
+    "default_item_id": "202077564"
   }
 }

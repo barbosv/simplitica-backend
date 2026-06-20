@@ -6,16 +6,26 @@ import { createHomeDepotRetailClient, isHomeDepotPricingConfigured } from "../pr
 import { MaterialsPricingService } from "../pricing/materials-service.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
 
+const optionalUSStateCode = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().length(2).optional(),
+);
+
+const optionalZipCode = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().regex(/^\d{5}$/).optional(),
+);
+
 const MaterialsRequestSchema = z.object({
   materials: z.array(z.string().min(1)).min(1),
   region_hint: z.string().optional(),
-  zip_code: z.string().regex(/^\d{5}$/).optional(),
+  zip_code: optionalZipCode,
   quantity: z.coerce.number().positive().default(1),
 });
 
 const WageRequestSchema = z.object({
   soc_code: z.string().min(1),
-  state_code: z.string().length(2).optional(),
+  state_code: optionalUSStateCode,
   fallback: z.coerce.number().nonnegative().default(0),
 });
 

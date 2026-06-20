@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RetailPriceProvider } from "./home-depot-client.js";
+import { agentDebugLog } from "./agent-debug-log.js";
 import { PricingCache } from "./pricing-cache.js";
 
 export type MaterialCatalogEntry = {
@@ -79,12 +80,8 @@ export class MaterialsPricingService {
 
     const cacheKey = `${zipCode ?? "US"}:${materialKey}`;
     const cached = this.cache.get(cacheKey);
-    if (cached !== undefined) {
-      return {
-        price: cached,
-        live: cached !== entry.fallback_price,
-        attemptedLiveLookup: cached !== entry.fallback_price,
-      };
+    if (cached) {
+      return cached;
     }
 
     let quote: { price: number } | null = null;
@@ -93,20 +90,63 @@ export class MaterialsPricingService {
       if (entry.default_item_id) {
         attemptedLiveLookup = true;
         quote = await this.provider.getProductById(entry.default_item_id, zipCode);
+        agentDebugLog({
+          location: "materials-service.ts:priceForMaterial",
+          message: "OpenWeb product-details lookup",
+          hypothesisId: "B",
+          data: {
+            materialKey,
+            itemId: entry.default_item_id,
+            hit: Boolean(quote),
+            price: quote?.price ?? null,
+          },
+        });
+      }
+      if (!quote) {
+        attemptedLiveLookup = true;
+        quote = await this.provider.lookupItem(entry.search_query, zipCode);
+        agentDebugLog({
+          location: "materials-service.ts:priceForMaterial",
+          message: "OpenWeb item-lookup fallback",
+          hypothesisId: "A",
+          data: {
+            materialKey,
+            query: entry.search_query,
+            hit: Boolean(quote),
+            price: quote?.price ?? null,
+          },
+        });
       }
       if (!quote) {
         attemptedLiveLookup = true;
         quote = await this.provider.searchProduct(entry.search_query, zipCode);
+        agentDebugLog({
+          location: "materials-service.ts:priceForMaterial",
+          message: "OpenWeb search fallback",
+          hypothesisId: "A",
+          data: {
+            materialKey,
+            query: entry.search_query,
+            hit: Boolean(quote),
+            price: quote?.price ?? null,
+          },
+        });
       }
     }
 
     if (quote) {
-      this.cache.set(cacheKey, quote.price);
-      return { price: quote.price, live: true, attemptedLiveLookup: true };
+      const result = { price: quote.price, live: true, attemptedLiveLookup: true };
+      this.cache.set(cacheKey, result);
+      return result;
     }
 
-    this.cache.set(cacheKey, entry.fallback_price);
-    return { price: entry.fallback_price, live: false, attemptedLiveLookup };
+    const fallback = {
+      price: entry.fallback_price,
+      live: false,
+      attemptedLiveLookup,
+    };
+    this.cache.set(cacheKey, fallback);
+    return fallback;
   }
 }
 

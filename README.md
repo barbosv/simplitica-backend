@@ -20,6 +20,7 @@ Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for
 |----------|----------|---------|
 | `HOME_DEPOT_DATA_API_KEY` | No | OpenWeb Ninja direct key (`ak_...`) or RapidAPI key |
 | `BLS_API_KEY` | No | BLS Public API registration key for cached OEWS wage lookups |
+| `SIMPLITICA_CLIENT_API_KEY` | No | When set, `/v1/pricing/*` requires matching `X-API-Key` header (shared with iOS `Subscription.xcconfig`) |
 | `HOME_DEPOT_DATA_API_BASE_URL` | No | Default: `https://api.openwebninja.com/realtime-homedepot-data` (direct). Set RapidAPI URL if using RapidAPI. |
 | `HOME_DEPOT_DATA_API_HOST` | No | **RapidAPI only** — sets `X-RapidAPI-Host`. Leave unset for OpenWeb direct (`x-api-key` auth). |
 

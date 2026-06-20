@@ -56,12 +56,43 @@ Create secrets (never commit values):
 | `STRIPE_SECRET_KEY_LIVE` | Platform live secret (when going live) |
 | `STRIPE_WEBHOOK_SECRET_LIVE` | Platform live webhook secret |
 | `HOME_DEPOT_DATA_API_KEY` | OpenWeb Ninja direct key (`ak_...`) for live material pricing |
+| `SIMPLITICA_CLIENT_API_KEY` | Shared secret for iOS app (`X-API-Key` on `/v1/pricing/*`). Create before deploy: `./scripts/set-client-api-key-secret.sh` |
 
 Optional Apple / app secrets if not using plain env vars.
 
 With Terraform, `DATABASE_URL` and platform Stripe secrets are created automatically; add `home_depot_data_api_key` to `terraform.tfvars` to provision `HOME_DEPOT_DATA_API_KEY`. Cloud Run deploy (`.github/workflows/deploy-cloud-run.yml`) mounts it via `--set-secrets`.
 
 **After adding the secret**, redeploy Cloud Run so `/v1/pricing/materials` is available (route ships with simplitica-backend main).
+
+### Pricing route protection (client API key)
+
+When `SIMPLITICA_CLIENT_API_KEY` is set on the server:
+
+- `POST /v1/pricing/wages` and `POST /v1/pricing/materials` require header `X-API-Key: <same value>`
+- Rate limit: **30 requests/minute** per key (or per IP if the header is missing)
+- `GET /health` stays public; `/health/ready` reports `pricing.client_api_key_required: true`
+
+If the env var is **unset**, pricing routes stay open (local dev / gradual rollout).
+
+**Rollout**
+
+```bash
+# 1. Generate + store in GCP (prints key for iOS)
+./scripts/set-client-api-key-secret.sh
+
+# 2. voice-invoice Config/Subscription.xcconfig (and Xcode Cloud env)
+#    SIMPLITICA_CLIENT_API_KEY = <same hex key>
+
+# 3. Push backend + redeploy Cloud Run (workflow mounts the secret)
+
+# 4. Rebuild/reinstall iOS app
+```
+
+Smoke test with auth:
+
+```bash
+SIMPLITICA_CLIENT_API_KEY=your-key ./scripts/smoke-pricing.sh
+```
 
 ## Stripe Connect model (platform vs customer)
 

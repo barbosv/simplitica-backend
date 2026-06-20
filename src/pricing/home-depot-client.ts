@@ -1,3 +1,5 @@
+import { agentDebugLog } from "./agent-debug-log.js";
+
 export type RetailProductQuote = {
   price: number;
   name: string;
@@ -38,6 +40,15 @@ export function isApiErrorPayload(payload: unknown): boolean {
   return typeof status === "string" && status.toUpperCase() === "ERROR";
 }
 
+function extractOfferPrice(root: Record<string, unknown>): number | undefined {
+  const offers = root.offers;
+  if (!offers || typeof offers !== "object") return undefined;
+  const primary = (offers as Record<string, unknown>).primary;
+  if (!primary || typeof primary !== "object") return undefined;
+  const p = primary as Record<string, unknown>;
+  return asNumber(p.price ?? p.regular_price ?? p.current_price);
+}
+
 export function extractPrice(payload: unknown): number | undefined {
   if (!payload || typeof payload !== "object") return undefined;
   if (isApiErrorPayload(payload)) return undefined;
@@ -45,6 +56,9 @@ export function extractPrice(payload: unknown): number | undefined {
 
   const direct = asNumber(root.price ?? root.current_price ?? root.sale_price);
   if (direct) return direct;
+
+  const offerPrice = extractOfferPrice(root);
+  if (offerPrice) return offerPrice;
 
   const pricing = root.pricing;
   if (pricing && typeof pricing === "object") {
@@ -78,10 +92,11 @@ export function extractPrice(payload: unknown): number | undefined {
 
   const product = root.product;
   if (product && typeof product === "object") {
-    return extractPrice(product);
+    const fromProduct = extractPrice(product);
+    if (fromProduct) return fromProduct;
   }
 
-  return undefined;
+  return extractOfferPrice(root);
 }
 
 export function extractName(payload: unknown): string | undefined {
@@ -90,9 +105,14 @@ export function extractName(payload: unknown): string | undefined {
   const direct = root.title ?? root.name ?? root.product_name;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
 
-  const products = root.products ?? root.results ?? root.items;
+  const products = root.products ?? root.results ?? root.items ?? root.search_results;
   if (Array.isArray(products) && products.length > 0) {
     return extractName(products[0]);
+  }
+
+  const result = root.result;
+  if (result && typeof result === "object") {
+    return extractName(result);
   }
 
   const data = root.data;
@@ -174,6 +194,7 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     if (detailsQuote) return detailsQuote;
 
     const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
+    lookupUrl.searchParams.set("item_id", itemId);
     lookupUrl.searchParams.set("search", itemId);
     lookupUrl.searchParams.set("page", "1");
     lookupUrl.searchParams.set("items_per_page", "1");
@@ -203,15 +224,47 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
       headers["x-api-key"] = this.apiKey!;
     }
 
-    const response = await this.fetchImpl(url, { headers, signal: AbortSignal.timeout(12_000) });
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, { headers, signal: AbortSignal.timeout(12_000) });
+    } catch (err) {
+      agentDebugLog({
+        location: "home-depot-client.ts:request",
+        message: "Home Depot fetch failed",
+        hypothesisId: "C",
+        data: { path: url.pathname, error: String(err) },
+      });
+      return null;
+    }
+
     let payload: unknown;
     try {
       payload = (await response.json()) as unknown;
     } catch {
+      agentDebugLog({
+        location: "home-depot-client.ts:request",
+        message: "Home Depot JSON parse failed",
+        hypothesisId: "D",
+        data: { path: url.pathname, status: response.status },
+      });
       return null;
     }
 
-    if (isApiErrorPayload(payload)) {
+    const errorPayload = isApiErrorPayload(payload);
+    const price = extractPrice(payload);
+    agentDebugLog({
+      location: "home-depot-client.ts:request",
+      message: "Home Depot API response",
+      hypothesisId: errorPayload ? "A" : price ? "B" : "D",
+      data: {
+        path: url.pathname,
+        status: response.status,
+        errorPayload,
+        parsedPrice: price ?? null,
+      },
+    });
+
+    if (errorPayload) {
       console.warn(
         `[pricing] Home Depot API error for ${url.pathname}${url.search}: ${JSON.stringify((payload as Record<string, unknown>).error ?? "unknown")}`,
       );
@@ -225,7 +278,6 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
       return null;
     }
 
-    const price = extractPrice(payload);
     if (!price) {
       console.warn(`[pricing] Home Depot API returned no parseable price for ${url.pathname}`);
       return null;
