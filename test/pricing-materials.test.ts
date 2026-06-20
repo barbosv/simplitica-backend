@@ -18,7 +18,7 @@ class StubRetailProvider implements RetailPriceProvider {
     return null;
   }
 
-  async getProductById(itemId: string): Promise<RetailProductQuote | null> {
+  async getProductById(itemId: string, _zipCode?: string, _productUrl?: string): Promise<RetailProductQuote | null> {
     if (itemId === "100037089") {
       return { price: this.prices.faucet ?? 92, name: "faucet" };
     }

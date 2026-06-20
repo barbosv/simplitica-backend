@@ -8,6 +8,7 @@ export type MaterialCatalogEntry = {
   search_query: string;
   fallback_price: number;
   default_item_id?: string | null;
+  default_product_url?: string | null;
   price_mode?: "per_sq_ft_proxy";
 };
 
@@ -86,16 +87,14 @@ export class MaterialsPricingService {
     let quote: { price: number } | null = null;
     let attemptedLiveLookup = false;
     if (this.liveLookupAvailable) {
+      attemptedLiveLookup = true;
       if (entry.default_item_id) {
-        attemptedLiveLookup = true;
-        quote = await this.provider.getProductById(entry.default_item_id, zipCode);
-      }
-      if (!quote) {
-        attemptedLiveLookup = true;
-        quote = await this.provider.lookupItem(entry.search_query, zipCode);
-      }
-      if (!quote) {
-        attemptedLiveLookup = true;
+        quote = await this.provider.getProductById(
+          entry.default_item_id,
+          zipCode,
+          entry.default_product_url ?? undefined,
+        );
+      } else {
         quote = await this.provider.searchProduct(entry.search_query, zipCode);
       }
     }

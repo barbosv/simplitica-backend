@@ -2,12 +2,14 @@
   "faucet": {
     "search_query": "kitchen faucet chrome",
     "fallback_price": 85,
-    "default_item_id": "100037089"
+    "default_item_id": "100037089",
+    "default_product_url": "https://www.homedepot.com/p/MOEN-Chateau-Single-Handle-Standard-Kitchen-Faucet-in-Chrome-7423/100037089"
   },
   "supply_lines": {
     "search_query": "faucet supply lines 2 pack",
     "fallback_price": 25,
-    "default_item_id": "205708840"
+    "default_item_id": "205708840",
+    "default_product_url": "https://www.homedepot.com/p/HOMEWERKS-1-2-in-FIP-x-3-8-in-OD-COMP-x-20-in-Braided-Stainless-Steel-Faucet-Supply-Line-2-Pack-7223-20-38-2BG2/205708840"
   },
   "paint": {
     "search_query": "interior paint gallon",

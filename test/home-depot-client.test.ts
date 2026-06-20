@@ -3,6 +3,7 @@ import {
   HomeDepotRetailClient,
   extractName,
   extractPrice,
+  isUpstreamFailure,
   resolveHomeDepotClientConfig,
 } from "../src/pricing/home-depot-client.js";
 
@@ -62,6 +63,29 @@ describe("home-depot-client", () => {
     expect(extractName(payload)).toBe("Kitchen Faucet");
   });
 
+  it("extracts price from OpenWeb OK product-details object payload", () => {
+    const payload = {
+      status: "OK",
+      data: {
+        item_id: "326680222",
+        title: "ONE+ 18V Cordless Drill/Driver Kit",
+        pricing: { current_price: 49.97, currency: "USD" },
+      },
+    };
+    expect(extractPrice(payload)).toBe(49.97);
+    expect(extractName(payload)).toBe("ONE+ 18V Cordless Drill/Driver Kit");
+  });
+
+  it("detects upstream 502 failures", () => {
+    expect(
+      isUpstreamFailure(
+        { status: "ERROR", error: { message: "Home Depot did not return product data.", code: 502 } },
+        502,
+      ),
+    ).toBe(true);
+    expect(isUpstreamFailure({ status: "OK", data: {} }, 200)).toBe(false);
+  });
+
   it("rejects OpenWeb ERROR payloads", () => {
     expect(
       extractPrice({
@@ -99,12 +123,6 @@ describe("home-depot-client", () => {
       fetchImpl: async (url, init) => {
         capturedUrls.push(url.toString());
         capturedHeaders = init?.headers as Record<string, string>;
-        if (url.toString().includes("/search")) {
-          return new Response(
-            JSON.stringify({ status: "ERROR", error: { message: "no search data", code: 502 } }),
-            { status: 502, headers: { "Content-Type": "application/json" } },
-          );
-        }
         return new Response(
           JSON.stringify({
             status: "OK",
@@ -117,15 +135,57 @@ describe("home-depot-client", () => {
 
     const quote = await client.searchProduct("kitchen faucet", "30309");
     expect(capturedHeaders["x-api-key"]).toBe("ak_test");
+    expect(capturedUrls).toHaveLength(1);
     expect(capturedUrls[0]).toContain("/search?");
     expect(capturedUrls[0]).toContain("items_per_page=1");
     expect(capturedUrls[0]).toContain("zipcode=30309");
     expect(capturedUrls[0]).not.toContain("limit=");
-    expect(capturedUrls[1]).toContain("/item-lookup?");
     expect(quote).toEqual({ price: 88.5, name: "Faucet" });
   });
 
-  it("uses product-details then item-lookup for item ids", async () => {
+  it("skips item-lookup fallback when search returns upstream 502", async () => {
+    const capturedUrls: string[] = [];
+    const client = new HomeDepotRetailClient({
+      apiKey: "ak_test",
+      baseUrl: "https://api.openwebninja.com/realtime-homedepot-data",
+      authMode: "openweb",
+      fetchImpl: async (url) => {
+        capturedUrls.push(url.toString());
+        return new Response(
+          JSON.stringify({ status: "ERROR", error: { message: "no search data", code: 502 } }),
+          { status: 502, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+
+    const quote = await client.searchProduct("kitchen faucet", "30309");
+    expect(quote).toBeNull();
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toContain("/search?");
+  });
+
+  it("skips item-lookup fallback when product-details returns upstream 502", async () => {
+    const requested: string[] = [];
+    const client = new HomeDepotRetailClient({
+      apiKey: "ak_test",
+      baseUrl: "https://api.openwebninja.com/realtime-homedepot-data",
+      authMode: "openweb",
+      fetchImpl: async (url) => {
+        const parsed = new URL(url instanceof URL ? url : String(url));
+        requested.push(parsed.pathname);
+        return new Response(
+          JSON.stringify({ status: "ERROR", error: { message: "no product", code: 502 } }),
+          { status: 502, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    });
+
+    const quote = await client.getProductById("326680222", "30301");
+    expect(quote).toBeNull();
+    expect(requested).toEqual(["/realtime-homedepot-data/product-details"]);
+  });
+
+  it("uses product-details then item-lookup for item ids when details miss without upstream failure", async () => {
     const requested: string[] = [];
     const lookupQueries: string[] = [];
     const client = new HomeDepotRetailClient({
@@ -140,8 +200,8 @@ describe("home-depot-client", () => {
         }
         if (parsed.pathname.endsWith("/product-details")) {
           return new Response(
-            JSON.stringify({ status: "ERROR", error: { message: "no product", code: 502 } }),
-            { status: 502, headers: { "Content-Type": "application/json" } },
+            JSON.stringify({ status: "ERROR", error: { message: "not found", code: 404 } }),
+            { status: 404, headers: { "Content-Type": "application/json" } },
           );
         }
         return new Response(

@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+
 export type RetailProductQuote = {
   price: number;
   name: string;
@@ -6,7 +8,7 @@ export type RetailProductQuote = {
 export interface RetailPriceProvider {
   searchProduct(query: string, zipCode?: string): Promise<RetailProductQuote | null>;
   lookupItem(search: string, zipCode?: string): Promise<RetailProductQuote | null>;
-  getProductById(itemId: string, zipCode?: string): Promise<RetailProductQuote | null>;
+  getProductById(itemId: string, zipCode?: string, productUrl?: string): Promise<RetailProductQuote | null>;
 }
 
 type AuthMode = "openweb" | "rapidapi";
@@ -36,6 +38,15 @@ export function isApiErrorPayload(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const status = (payload as Record<string, unknown>).status;
   return typeof status === "string" && status.toUpperCase() === "ERROR";
+}
+
+export function isUpstreamFailure(payload: unknown, httpStatus: number): boolean {
+  if (httpStatus === 429 || httpStatus === 502 || httpStatus === 503) return true;
+  if (!payload || typeof payload !== "object") return false;
+  const error = (payload as Record<string, unknown>).error;
+  if (!error || typeof error !== "object") return false;
+  const code = (error as Record<string, unknown>).code;
+  return code === 429 || code === 502 || code === 503;
 }
 
 function extractOfferPrice(root: Record<string, unknown>): number | undefined {
@@ -159,15 +170,16 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     searchUrl.searchParams.set("sort_by", "best_match");
     this.applyLocalization(searchUrl, zipCode);
 
-    const searchQuote = await this.request(searchUrl);
-    if (searchQuote) return searchQuote;
+    const searchResult = await this.request(searchUrl);
+    if (searchResult.quote) return searchResult.quote;
+    if (searchResult.upstreamFailure) return null;
 
     const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
     lookupUrl.searchParams.set("search", query);
     lookupUrl.searchParams.set("page", "1");
     lookupUrl.searchParams.set("items_per_page", "1");
     this.applyLocalization(lookupUrl, zipCode);
-    return this.request(lookupUrl);
+    return this.request(lookupUrl).then((result) => result.quote);
   }
 
   async lookupItem(search: string, zipCode?: string): Promise<RetailProductQuote | null> {
@@ -178,18 +190,27 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     lookupUrl.searchParams.set("page", "1");
     lookupUrl.searchParams.set("items_per_page", "1");
     this.applyLocalization(lookupUrl, zipCode);
-    return this.request(lookupUrl);
+    return this.request(lookupUrl).then((result) => result.quote);
   }
 
-  async getProductById(itemId: string, zipCode?: string): Promise<RetailProductQuote | null> {
+  async getProductById(
+    itemId: string,
+    zipCode?: string,
+    productUrl?: string,
+  ): Promise<RetailProductQuote | null> {
     if (!this.apiKey) return null;
 
     const detailsUrl = new URL(`${this.baseUrl}/product-details`);
     detailsUrl.searchParams.set("item_id", itemId);
+    const canonicalUrl = productUrl?.trim();
+    if (canonicalUrl) {
+      detailsUrl.searchParams.set("url", canonicalUrl);
+    }
     this.applyLocalization(detailsUrl, zipCode);
 
-    const detailsQuote = await this.request(detailsUrl);
-    if (detailsQuote) return detailsQuote;
+    const detailsResult = await this.request(detailsUrl);
+    if (detailsResult.quote) return detailsResult.quote;
+    if (detailsResult.upstreamFailure) return null;
 
     const lookupUrl = new URL(`${this.baseUrl}/item-lookup`);
     lookupUrl.searchParams.set("item_id", itemId);
@@ -197,7 +218,7 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     lookupUrl.searchParams.set("page", "1");
     lookupUrl.searchParams.set("items_per_page", "1");
     this.applyLocalization(lookupUrl, zipCode);
-    return this.request(lookupUrl);
+    return this.request(lookupUrl).then((result) => result.quote);
   }
 
   private applyLocalization(url: URL, zipCode?: string, storeId?: string): void {
@@ -211,7 +232,15 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     }
   }
 
-  private async request(url: URL): Promise<RetailProductQuote | null> {
+  private async request(
+    url: URL,
+  ): Promise<{ quote: RetailProductQuote | null; upstreamFailure: boolean }> {
+    return this.requestOnce(url);
+  }
+
+  private async requestOnce(
+    url: URL,
+  ): Promise<{ quote: RetailProductQuote | null; upstreamFailure: boolean }> {
     const headers: Record<string, string> = {
       Accept: "application/json",
     };
@@ -227,31 +256,60 @@ export class HomeDepotRetailClient implements RetailPriceProvider {
     try {
       payload = (await response.json()) as unknown;
     } catch {
-      return null;
+      return { quote: null, upstreamFailure: false };
     }
+
+    const upstreamFailure = isUpstreamFailure(payload, response.status);
+
+    // #region agent log
+    try {
+      appendFileSync(
+        "/Users/vitorbarbosa/Repositories/iOS/voice-invoice/.cursor/debug-33edb4.log",
+        `${JSON.stringify({
+          sessionId: "33edb4",
+          hypothesisId: upstreamFailure ? "A" : "B",
+          location: "home-depot-client.ts:requestOnce",
+          message: "openweb_response",
+          data: {
+            path: url.pathname,
+            httpStatus: response.status,
+            upstreamFailure,
+            apiStatus: (payload as Record<string, unknown>)?.status ?? null,
+            errorCode: ((payload as Record<string, unknown>)?.error as Record<string, unknown> | undefined)?.code ?? null,
+          },
+          timestamp: Date.now(),
+        })}\n`,
+      );
+    } catch {
+      // Local debug log only.
+    }
+    // #endregion
 
     if (isApiErrorPayload(payload)) {
       console.warn(
         `[pricing] Home Depot API error for ${url.pathname}${url.search}: ${JSON.stringify((payload as Record<string, unknown>).error ?? "unknown")}`,
       );
-      return null;
+      return { quote: null, upstreamFailure };
     }
 
     if (!response.ok) {
       console.warn(
         `[pricing] Home Depot API ${response.status} for ${url.pathname}${url.search}`,
       );
-      return null;
+      return { quote: null, upstreamFailure };
     }
 
     const price = extractPrice(payload);
     if (!price) {
       console.warn(`[pricing] Home Depot API returned no parseable price for ${url.pathname}`);
-      return null;
+      return { quote: null, upstreamFailure: false };
     }
     return {
-      price,
-      name: extractName(payload) ?? "Home Depot item",
+      quote: {
+        price,
+        name: extractName(payload) ?? "Home Depot item",
+      },
+      upstreamFailure: false,
     };
   }
 }
