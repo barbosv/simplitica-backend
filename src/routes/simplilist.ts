@@ -48,15 +48,16 @@ export async function registerSimplilistRoutes(app: FastifyInstance, env: Env) {
   });
 
   app.get("/v1/deals/publix/bogo", withSimplilistGuards, async (req, reply) => {
-    const query = req.query as { storeNumber?: string; refresh?: string };
+    const query = req.query as { storeNumber?: string; zip?: string; refresh?: string };
     const storeNumber = String(query?.storeNumber ?? "").trim();
     if (!storeNumber) {
       return reply.code(400).send({ error: "invalid_store_number" });
     }
+    const zip = String(query?.zip ?? "").trim();
     const refresh = String(query?.refresh ?? "").toLowerCase() === "true";
-    logInfo("publix_bogo_request", { deviceId: deviceId(req), storeNumber, refresh });
+    logInfo("publix_bogo_request", { deviceId: deviceId(req), storeNumber, zip, refresh });
     try {
-      return await fetchBOGOCatalog(env, storeNumber, { forceRefresh: refresh });
+      return await fetchBOGOCatalog(env, storeNumber, { zip, forceRefresh: refresh });
     } catch (error) {
       const code = (error as { code?: string })?.code || "upstream";
       logInfo("publix_bogo_error", { message: String((error as Error)?.message || error), code });

@@ -8,8 +8,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = join(__dirname, "fixtures/publix-bogo-sample.json");
 
 const STORE_LOCATOR_URL = "https://services.publix.com/api/v1/storelocation";
-const SAVINGS_GRAPHQL_URL = "https://services.publix.com/search/api/search/storeproductssavings/";
 const PUBLIX_ORIGIN = "https://www.publix.com";
+
+// Publix's own savings endpoint is behind Akamai bot protection (HTTP 403 for
+// server-side calls). Publix's weekly ad is also published via Flipp/Wishabi,
+// whose API returns plain JSON without bot protection, so we source BOGO deals
+// from there. `PUBLIX_FLIPP_MERCHANT_ID` is Publix's merchant id on Flipp.
+const FLIPP_BASE_URL = "https://backflipp.wishabi.com/flipp";
+const FLIPP_LOCALE = "en-us";
+const PUBLIX_FLIPP_MERCHANT_ID = 2361;
 
 const BOGO_RE =
   /\bbogo\b|buy\s*one\s*get\s*one|buy\s*1\s*get\s*1|\bb1g1\b|buy\s*two\s*get\s*one|buy\s*2\s*get\s*1/i;
@@ -21,6 +28,13 @@ const PUBLIX_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
   Origin: PUBLIX_ORIGIN,
   Referer: `${PUBLIX_ORIGIN}/savings/weekly-ad/bogo`,
+};
+
+const FLIPP_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
 };
 
 export type PublixStore = {
@@ -90,82 +104,55 @@ function pickString(...values: unknown[]): string {
   return "";
 }
 
-function normalizeDeal(raw: Record<string, unknown>, index = 0): PublixDeal | null {
-  const title = pickString(raw.title, raw.Title, raw.name, raw.Name, raw.productName, raw.ProductName);
+function toDayString(raw: unknown): string | null {
+  const match = String(raw ?? "").match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : null;
+}
+
+function toHttps(url: string): string {
+  return url.startsWith("http://") ? `https://${url.slice("http://".length)}` : url;
+}
+
+/** Strips Publix's trailing ad markers ("BOGO*", "†", "*") from an item name. */
+function cleanDealTitle(name: string): string {
+  return name
+    .replace(/\bbogo\b\*?/gi, "")
+    .replace(/[†*]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Maps a Flipp flyer item to a `PublixDeal`. Returns null when no usable title. */
+function normalizeFlippItem(raw: Record<string, unknown>): PublixDeal | null {
+  const rawName = pickString(raw.name, raw.short_name, raw.Name);
+  if (!rawName) return null;
+  const title = cleanDealTitle(rawName);
   if (!title) return null;
 
-  const promoText = pickString(
-    raw.promoText,
-    raw.promoMsg,
-    raw.promoMessage,
-    raw.savingLine,
-    raw.SavingLine,
-    raw.promotionText,
-    raw.PromotionText,
-    raw.dealText,
-    raw.DealText,
-  );
-  const description = pickString(raw.description, raw.Description, raw.subtitle, raw.Subtitle);
-  const savings = pickString(raw.savings, raw.Savings, raw.savingAmount, raw.SavingAmount);
-  const department = pickString(raw.department, raw.Department, raw.category, raw.Category);
   const brand = pickString(raw.brand, raw.Brand);
-  const imageURL = pickString(raw.imageURL, raw.ImageUrl, raw.imageUrl, raw.image, raw.Image);
-  const validThrough = pickString(
-    raw.validThrough,
-    raw.ValidThrough,
-    raw.WA_EndDate,
-    raw.endDate,
-    raw.EndDate,
-  );
-
+  const savings = pickString(raw.sale_story, raw.savings)
+    .replace(/^save up to\s*/i, "")
+    .replace(/^\$/, "");
+  const image = pickString(raw.cutout_image_url, raw.clean_image_url, raw.clipping_image_url);
+  const validThrough = toDayString(pickString(raw.valid_to, raw.available_to, raw.validThrough));
   const id =
-    pickString(raw.id, raw.Id, raw.productId, raw.ProductId) ||
-    stableDealID([title, promoText, savings, String(index)]);
+    pickString(String(raw.id ?? ""), String(raw.flyer_item_id ?? "")) || stableDealID([title, brand]);
 
   return {
     id,
     title,
-    description,
-    savings: savings.replace(/^\$/, ""),
-    department,
+    description: "",
+    savings,
+    department: "",
     brand,
-    imageURL: imageURL || null,
-    promoText: promoText || "Buy One Get One Free",
-    validThrough: validThrough || null,
+    imageURL: image ? toHttps(image) : null,
+    promoText: "Buy One Get One Free",
+    validThrough,
   };
 }
 
-function filterBOGODeals(deals: PublixDeal[]): PublixDeal[] {
-  return deals.filter((deal) => isBOGOPromoText(deal.promoText) || isBOGOPromoText(deal.title));
-}
-
-function collectDealCandidates(node: unknown, out: PublixDeal[] = []): PublixDeal[] {
-  if (node == null) return out;
-  if (Array.isArray(node)) {
-    for (const item of node) collectDealCandidates(item, out);
-    return out;
-  }
-  if (typeof node !== "object") return out;
-
-  const record = node as Record<string, unknown>;
-  const title = pickString(record.title, record.Title, record.name, record.Name, record.productName);
-  const promo = pickString(
-    record.promoText,
-    record.promoMsg,
-    record.savingLine,
-    record.SavingLine,
-    record.promotionText,
-    record.PromotionText,
-  );
-  if (title && (promo || record.savings || record.Savings || record.department || record.Department)) {
-    const normalized = normalizeDeal(record, out.length);
-    if (normalized) out.push(normalized);
-  }
-
-  for (const value of Object.values(record)) {
-    if (value && typeof value === "object") collectDealCandidates(value, out);
-  }
-  return out;
+function isBOGOItem(raw: Record<string, unknown>): boolean {
+  return isBOGOPromoText(pickString(raw.name, raw.short_name)) || isBOGOPromoText(pickString(raw.sale_story));
 }
 
 function dedupeDeals(deals: PublixDeal[]): PublixDeal[] {
@@ -244,86 +231,79 @@ export async function findStoresByZip(zipCode: string): Promise<PublixStore[]> {
     .filter((store) => store.storeNumber);
 }
 
-async function fetchWeeklyAdDeals(storeNumber: string): Promise<{
-  storeNumber: string;
+type FlippFlyer = {
+  id: number;
+  merchant_id?: number;
+  name?: string;
+  valid_from?: string;
+  valid_to?: string;
+};
+
+function upstreamError(message: string, status?: number): Error {
+  return Object.assign(new Error(message), { code: "upstream", status });
+}
+
+/** Finds Publix's English "Weekly Ad" flyer (the BOGO source) for a ZIP via Flipp. */
+async function findPublixWeeklyAdFlyer(zip: string): Promise<FlippFlyer> {
+  const url = new URL(`${FLIPP_BASE_URL}/flyers`);
+  url.searchParams.set("locale", FLIPP_LOCALE);
+  url.searchParams.set("postal_code", zip);
+
+  const response = await fetch(url, { headers: FLIPP_HEADERS });
+  if (!response.ok) {
+    throw upstreamError(`flipp_flyers_${response.status}`, response.status);
+  }
+
+  const body = (await response.json()) as { flyers?: FlippFlyer[] } | FlippFlyer[];
+  const flyers = Array.isArray(body) ? body : (body.flyers ?? []);
+  const publix = flyers.filter((flyer) => flyer.merchant_id === PUBLIX_FLIPP_MERCHANT_ID);
+
+  // Prefer the English "Weekly Ad"; skip the Spanish "Anuncio Semanal" duplicate
+  // and the "Extra Savings"/"Liquor" flyers when a weekly ad is present.
+  const weekly =
+    publix.find((flyer) => /weekly ad/i.test(flyer.name ?? "")) ??
+    publix.find((flyer) => !/espa|anuncio|liquor/i.test(flyer.name ?? "")) ??
+    publix[0];
+
+  if (!weekly?.id) {
+    throw upstreamError("flipp_no_publix_flyer");
+  }
+  return weekly;
+}
+
+async function fetchFlyerItems(flyerId: number, zip: string): Promise<Record<string, unknown>[]> {
+  const url = new URL(`${FLIPP_BASE_URL}/flyers/${flyerId}`);
+  url.searchParams.set("locale", FLIPP_LOCALE);
+  url.searchParams.set("postal_code", zip);
+
+  const response = await fetch(url, { headers: FLIPP_HEADERS });
+  if (!response.ok) {
+    throw upstreamError(`flipp_flyer_items_${response.status}`, response.status);
+  }
+
+  const body = (await response.json()) as { items?: unknown };
+  return Array.isArray(body?.items) ? (body.items as Record<string, unknown>[]) : [];
+}
+
+async function fetchWeeklyAdDeals(zip: string): Promise<{
   validFrom: string | null;
   validThrough: string | null;
   source: string;
   deals: PublixDeal[];
 }> {
-  const body = {
-    operationName: "SearchStoreProductsSavings",
-    variables: {
-      storeNumber,
-      categoryId: "bogo",
-      pageNumber: 1,
-      pageSize: 200,
-      language: "en",
-    },
-    query: `query SearchStoreProductsSavings($storeNumber: String!, $categoryId: String, $pageNumber: Int, $pageSize: Int, $language: String) {
-      searchStoreProductsSavings(
-        storeNumber: $storeNumber
-        categoryId: $categoryId
-        pageNumber: $pageNumber
-        pageSize: $pageSize
-        language: $language
-      ) {
-        items {
-          id
-          title
-          description
-          savings
-          department
-          brand
-          imageUrl
-          promoText
-          validThrough
-          validFrom
-        }
-        validFrom
-        validThrough
-      }
-    }`,
-  };
-
-  const response = await fetch(SAVINGS_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      ...PUBLIX_HEADERS,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw Object.assign(new Error(`publix_graphql_${response.status}`), {
-      code: "upstream",
-      status: response.status,
-    });
-  }
-
-  const json = (await response.json()) as {
-    errors?: unknown[];
-    data?: { searchStoreProductsSavings?: Record<string, unknown> };
-  };
-  if (json?.errors?.length) {
-    throw Object.assign(new Error("publix_graphql_errors"), { code: "upstream", details: json.errors });
-  }
-
-  const root = json?.data?.searchStoreProductsSavings ?? json?.data ?? json;
-  const rootRecord = root as Record<string, unknown>;
-  const items = Array.isArray(rootRecord?.items)
-    ? (rootRecord.items as Record<string, unknown>[])
-    : collectDealCandidates(json?.data ?? json);
+  const flyer = await findPublixWeeklyAdFlyer(zip);
+  const items = await fetchFlyerItems(flyer.id, zip);
 
   const deals = dedupeDeals(
-    items.map((item, index) => normalizeDeal(item, index)).filter((deal): deal is PublixDeal => deal != null),
+    items
+      .filter(isBOGOItem)
+      .map((item) => normalizeFlippItem(item))
+      .filter((deal): deal is PublixDeal => deal != null),
   );
 
   return {
-    storeNumber,
-    validFrom: pickString(rootRecord?.validFrom, rootRecord?.WA_StartDate) || null,
-    validThrough: pickString(rootRecord?.validThrough, rootRecord?.WA_EndDate) || null,
+    validFrom: toDayString(flyer.valid_from),
+    validThrough: toDayString(flyer.valid_to),
     source: "publix",
     deals,
   };
@@ -332,38 +312,45 @@ async function fetchWeeklyAdDeals(storeNumber: string): Promise<{
 export async function fetchBOGOCatalog(
   env: Env,
   storeNumberRaw: string,
-  { forceRefresh = false }: { forceRefresh?: boolean } = {},
+  { zip = "", forceRefresh = false }: { zip?: string; forceRefresh?: boolean } = {},
 ): Promise<PublixBOGOCatalog> {
   const storeNumber = normalizeStoreNumber(storeNumberRaw);
   if (!storeNumber) {
     throw Object.assign(new Error("invalid_store_number"), { code: "invalid_store_number" });
   }
 
+  // Publix BOGOs are regional (shared across stores in an ad zone), so the ad is
+  // resolved by ZIP. Cache by ZIP when available to share results across stores.
+  const normalizedZip = /^\d{5}$/.test(zip.trim()) ? zip.trim() : null;
+  const cacheId = normalizedZip ?? storeNumber;
+
   if (!forceRefresh) {
-    const cached = readCache(storeNumber);
+    const cached = readCache(cacheId);
     if (cached) return cached;
   }
 
   if (useFixture(env)) {
     const fixture = loadFixtureCatalog(storeNumber);
-    writeCache(env, storeNumber, fixture);
+    writeCache(env, cacheId, fixture);
     return fixture;
   }
 
   try {
-    const catalog = await fetchWeeklyAdDeals(storeNumber);
-    const bogoDeals = filterBOGODeals(catalog.deals);
+    if (!normalizedZip) {
+      throw upstreamError("missing_zip");
+    }
+    const catalog = await fetchWeeklyAdDeals(normalizedZip);
     const payload: PublixBOGOCatalog = {
       storeNumber,
       validFrom: catalog.validFrom,
       validThrough: catalog.validThrough,
       source: catalog.source,
-      deals: bogoDeals,
+      deals: catalog.deals,
     };
     if (payload.deals.length === 0) {
       throw Object.assign(new Error("no_bogo_deals"), { code: "no_bogo_deals" });
     }
-    writeCache(env, storeNumber, payload);
+    writeCache(env, cacheId, payload);
     return payload;
   } catch (error) {
     // A genuinely empty BOGO week from a reachable upstream should surface as
@@ -371,13 +358,12 @@ export async function fetchBOGOCatalog(
     if ((error as { code?: string })?.code === "no_bogo_deals") {
       throw error;
     }
-    // Publix's savings API sits behind Akamai bot protection and routinely
-    // blocks server-side requests (HTTP 403). Serve the bundled sample catalog
-    // (tagged source:"fixture") so the app still shows deals instead of an
-    // error. Clients can distinguish live vs. sample data via `source`.
+    // The Flipp upstream (or ZIP lookup) failed. Serve the bundled sample
+    // catalog (tagged source:"fixture") so the app still shows deals instead of
+    // an error. Clients can distinguish live vs. sample data via `source`.
     const fixture = loadFixtureCatalog(storeNumber);
     fixture.fallbackReason = String((error as Error)?.message || error);
-    writeCache(env, storeNumber, fixture);
+    writeCache(env, cacheId, fixture);
     return fixture;
   }
 }
