@@ -91,18 +91,7 @@ jobs:
           IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/simplitica-backend:${{ github.sha }}
         run: |
           # Core secrets (unchanged from pre-SimpliList deploy). Cloud Run validates these exist.
-          SECRETS_LIST="DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,STRIPE_SECRET_KEY_LIVE=STRIPE_SECRET_KEY_LIVE:latest,STRIPE_WEBHOOK_SECRET_LIVE=STRIPE_WEBHOOK_SECRET_LIVE:latest,HOME_DEPOT_DATA_API_KEY=HOME_DEPOT_DATA_API_KEY:latest,RETAILERAPI_KEY=RETAILERAPI_KEY:latest,BLS_API_KEY=BLS_API_KEY:latest,SIMPLITICA_CLIENT_API_KEY=SIMPLITICA_CLIENT_API_KEY:latest"
-
-          # SimpliList Publix deals — optional until secret is created.
-          for entry in SIMPLILIST_BACKEND_API_KEY=SIMPLILIST_BACKEND_API_KEY:latest; do
-            secret_id="${entry%%=*}"
-            if gcloud secrets describe "$secret_id" --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
-              SECRETS_LIST="${SECRETS_LIST},${entry}"
-              echo "Mounting optional secret $secret_id"
-            else
-              echo "Optional secret $secret_id not found — skipping (Publix deals return simplilist_not_configured until created)"
-            fi
-          done
+          SECRETS_LIST="DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,STRIPE_SECRET_KEY_LIVE=STRIPE_SECRET_KEY_LIVE:latest,STRIPE_WEBHOOK_SECRET_LIVE=STRIPE_WEBHOOK_SECRET_LIVE:latest,HOME_DEPOT_DATA_API_KEY=HOME_DEPOT_DATA_API_KEY:latest,RETAILERAPI_KEY=RETAILERAPI_KEY:latest,BLS_API_KEY=BLS_API_KEY:latest,SIMPLITICA_CLIENT_API_KEY=SIMPLITICA_CLIENT_API_KEY:latest,SIMPLILIST_BACKEND_API_KEY=SIMPLILIST_BACKEND_API_KEY:latest"
 
           DEPLOY_ARGS=(
             "${{ env.CLOUD_RUN_SERVICE }}"
