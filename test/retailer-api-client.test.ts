@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   RetailerApiRetailClient,
+  buildRetailerApiLookupAttempts,
   extractRetailerApiName,
   extractRetailerApiPrice,
 } from "../src/pricing/retailer-api-client.js";
@@ -16,7 +17,18 @@ describe("retailer-api-client", () => {
     expect(extractRetailerApiName({ title: "MOEN Kitchen Faucet" })).toBe("MOEN Kitchen Faucet");
   });
 
-  it("sends Bearer auth and retailer=homedepot for item_id lookup", async () => {
+  it("builds lookup attempts in priority order", () => {
+    const productUrl =
+      "https://www.homedepot.com/p/HOMEWERKS-Faucet-Supply-Line-2-Pack/205708840";
+    const attempts = buildRetailerApiLookupAttempts("205708840", productUrl);
+    expect(attempts).toEqual([
+      { identifier: "205708840", format: "item_id" },
+      { identifier: productUrl },
+      { identifier: "https://www.homedepot.com/p/205708840" },
+    ]);
+  });
+
+  it("sends Bearer auth, format=item_id, and retailer=homedepot for item_id lookup", async () => {
     let capturedUrl = "";
     let capturedHeaders: Record<string, string> = {};
 
@@ -42,33 +54,39 @@ describe("retailer-api-client", () => {
     expect(quote).toEqual({ price: 92.5, name: "MOEN Kitchen Faucet" });
     expect(capturedHeaders.authorization).toBe("Bearer rk_live_test");
     expect(capturedUrl).toContain("/products/100037089");
+    expect(capturedUrl).toContain("format=item_id");
     expect(capturedUrl).toContain("retailer=homedepot");
   });
 
-  it("prefers homedepot product URL as identifier", async () => {
-    let capturedUrl = "";
-
-    const fetchImpl: typeof fetch = async (input) => {
-      capturedUrl = String(input);
-      return new Response(
-        JSON.stringify({ title: "Supply Lines", current_price: 28 }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    };
-
-    const client = new RetailerApiRetailClient({
-      apiKey: "rk_live_test",
-      fetchImpl,
-    });
-
+  it("retries with homedepot product URL after item_id 404", async () => {
+    const calls: string[] = [];
     const productUrl =
       "https://www.homedepot.com/p/HOMEWERKS-Faucet-Supply-Line-2-Pack/205708840";
+
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("format=item_id")) {
+        return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+      }
+      if (url.includes(encodeURIComponent(productUrl))) {
+        return new Response(
+          JSON.stringify({ title: "Supply Lines", current_price: 28 }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+    };
+
+    const client = new RetailerApiRetailClient({ apiKey: "rk_live_test", fetchImpl });
     const quote = await client.getProductById("205708840", undefined, productUrl);
     expect(quote?.price).toBe(28);
-    expect(capturedUrl).toContain(encodeURIComponent(productUrl));
+    expect(calls.length).toBeGreaterThan(1);
+    expect(calls[0]).toContain("format=item_id");
+    expect(calls.some((call) => call.includes(encodeURIComponent(productUrl)))).toBe(true);
   });
 
-  it("returns null on 404", async () => {
+  it("returns null when all attempts fail", async () => {
     const fetchImpl = async () =>
       new Response(JSON.stringify({ error: "not found" }), { status: 404 });
 

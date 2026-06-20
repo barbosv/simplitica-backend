@@ -34,17 +34,20 @@
   "window_unit": {
     "search_query": "vinyl replacement window",
     "fallback_price": 250,
-    "default_item_id": "306643885"
+    "default_item_id": "204814630",
+    "default_product_url": "https://www.homedepot.com/p/American-Craftsman-29-75-in-x-65-25-in-70-Pro-Series-White-Double-Hung-Low-E-Argon-Glass-Vinyl-Replacement-Window-Screen-Incl-3066786/204814630"
   },
   "flashing": {
     "search_query": "roof flashing roll",
     "fallback_price": 45,
-    "default_item_id": "202091965"
+    "default_item_id": "202093203",
+    "default_product_url": "https://www.homedepot.com/p/Gibraltar-Building-Products-2-in-x-3-in-x-10-ft-Galvanized-Steel-Roof-To-Wall-Flashing-RW23G/202093203"
   },
   "caulk": {
     "search_query": "exterior caulk tube",
     "fallback_price": 12,
-    "default_item_id": "202077564"
+    "default_item_id": "206284062",
+    "default_product_url": "https://www.homedepot.com/p/OSI-QUAD-Advanced-10-oz-Clear-000-Exterior-Window-Door-and-Siding-Caulk-Sealant-2097583/206284062"
   },
   "shingles": {
     "search_query": "architectural shingles bundle",
@@ -110,7 +113,8 @@
   "hardware": {
     "search_query": "deck hardware kit",
     "fallback_price": 80,
-    "default_item_id": "202091965"
+    "default_item_id": "202093203",
+    "default_product_url": "https://www.homedepot.com/p/Gibraltar-Building-Products-2-in-x-3-in-x-10-ft-Galvanized-Steel-Roof-To-Wall-Flashing-RW23G/202093203"
   },
   "concrete": {
     "search_query": "concrete mix 80 lb bag",
@@ -145,6 +149,7 @@
   "sealant": {
     "search_query": "gutter sealant",
     "fallback_price": 15,
-    "default_item_id": "202077564"
+    "default_item_id": "206284062",
+    "default_product_url": "https://www.homedepot.com/p/OSI-QUAD-Advanced-10-oz-Clear-000-Exterior-Window-Door-and-Siding-Caulk-Sealant-2097583/206284062"
   }
 }

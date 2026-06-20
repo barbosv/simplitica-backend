@@ -9,6 +9,11 @@ type RetailerApiClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
+type LookupAttempt = {
+  identifier: string;
+  format?: "item_id";
+};
+
 function asNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
   if (typeof value === "string") {
@@ -30,10 +35,33 @@ export function extractRetailerApiName(payload: unknown): string | undefined {
   return typeof title === "string" && title.trim() ? title.trim() : undefined;
 }
 
-function resolveIdentifier(itemId: string, productUrl?: string): string {
+export function buildRetailerApiLookupAttempts(
+  itemId: string,
+  productUrl?: string,
+): LookupAttempt[] {
+  const attempts: LookupAttempt[] = [];
+  const id = itemId.trim();
   const url = productUrl?.trim();
-  if (url && url.includes("homedepot.com")) return url;
-  return itemId.trim();
+  const seen = new Set<string>();
+
+  const add = (identifier: string, format?: "item_id") => {
+    const key = `${format ?? "auto"}:${identifier}`;
+    if (!identifier || seen.has(key)) return;
+    seen.add(key);
+    attempts.push({ identifier, format });
+  };
+
+  if (id) {
+    add(id, "item_id");
+  }
+  if (url && url.includes("homedepot.com")) {
+    add(url);
+  }
+  if (id) {
+    add(`https://www.homedepot.com/p/${id}`);
+  }
+
+  return attempts;
 }
 
 export class RetailerApiRetailClient implements RetailPriceProvider {
@@ -62,12 +90,21 @@ export class RetailerApiRetailClient implements RetailPriceProvider {
   ): Promise<RetailProductQuote | null> {
     if (!this.apiKey) return null;
 
-    const identifier = resolveIdentifier(itemId, productUrl);
-    if (!identifier) return null;
+    const attempts = buildRetailerApiLookupAttempts(itemId, productUrl);
+    for (const attempt of attempts) {
+      const quote = await this.lookupOnce(attempt);
+      if (quote) return quote;
+    }
+    return null;
+  }
 
-    const path = `/products/${encodeURIComponent(identifier)}`;
+  private async lookupOnce(attempt: LookupAttempt): Promise<RetailProductQuote | null> {
+    const path = `/products/${encodeURIComponent(attempt.identifier)}`;
     const url = new URL(`${this.baseUrl}${path}`);
     url.searchParams.set("retailer", HOME_DEPOT_RETAILER);
+    if (attempt.format) {
+      url.searchParams.set("format", attempt.format);
+    }
 
     const headers: Record<string, string> = {
       Accept: "application/json",
@@ -86,15 +123,20 @@ export class RetailerApiRetailClient implements RetailPriceProvider {
     }
 
     let payload: unknown;
+    let rawText = "";
     try {
-      payload = (await response.json()) as unknown;
+      rawText = await response.text();
+      payload = rawText ? (JSON.parse(rawText) as unknown) : undefined;
     } catch {
       console.warn(`[pricing] RetailerAPI invalid JSON for ${path}`);
       return null;
     }
 
     if (response.status === 404) {
-      console.warn(`[pricing] RetailerAPI product not found for ${path}`);
+      const snippet = rawText.slice(0, 200);
+      console.warn(
+        `[pricing] RetailerAPI product not found for ${path} (body=${snippet || "empty"})`,
+      );
       return null;
     }
 
@@ -113,7 +155,7 @@ export class RetailerApiRetailClient implements RetailPriceProvider {
       const root = payload as Record<string, unknown>;
       console.warn(
         `[pricing] RetailerAPI returned no parseable price for ${path} ` +
-          `(keys=${Object.keys(root).join(",")})`,
+          `(keys=${Object.keys(root ?? {}).join(",")})`,
       );
       return null;
     }
