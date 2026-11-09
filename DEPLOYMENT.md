@@ -1,5 +1,7 @@
 # Production deployment (Cloud Run + Cloud SQL)
 
+> Legacy deployment reference. The Workers + D1 path is documented in [Cloudflare cutover](docs/cloudflare-cutover.md). The Cloud Run workflow now requires an explicit manual legacy-deploy selection; pushes do not deploy GCP. Do not retire GCP until the Cloudflare hostname and app/payment flows have been verified.
+
 Simplitica backend serves:
 
 - **Apple subscriptions**: client sync + App Store Server Notifications v2

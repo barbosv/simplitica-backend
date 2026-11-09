@@ -1,11 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import fixtureCatalog from "./fixtures/publix-bogo-sample.json" with { type: "json" };
 import type { Env } from "../env.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURE_PATH = join(__dirname, "fixtures/publix-bogo-sample.json");
 
 const STORE_LOCATOR_URL = "https://services.publix.com/api/v1/storelocation";
 const PUBLIX_ORIGIN = "https://www.publix.com";
@@ -90,7 +85,10 @@ function normalizeStoreNumber(raw: unknown): string | null {
 }
 
 function stableDealID(parts: Array<string | undefined>): string {
-  return createHash("sha1").update(parts.filter(Boolean).join("|")).digest("hex").slice(0, 16);
+  return createHash("sha1")
+    .update(parts.filter(Boolean).join("|"))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export function isBOGOPromoText(text: string): boolean {
@@ -110,7 +108,9 @@ function toDayString(raw: unknown): string | null {
 }
 
 function toHttps(url: string): string {
-  return url.startsWith("http://") ? `https://${url.slice("http://".length)}` : url;
+  return url.startsWith("http://")
+    ? `https://${url.slice("http://".length)}`
+    : url;
 }
 
 /** Strips Publix's trailing ad markers ("BOGO*", "†", "*") from an item name. */
@@ -133,10 +133,17 @@ function normalizeFlippItem(raw: Record<string, unknown>): PublixDeal | null {
   const savings = pickString(raw.sale_story, raw.savings)
     .replace(/^save up to\s*/i, "")
     .replace(/^\$/, "");
-  const image = pickString(raw.cutout_image_url, raw.clean_image_url, raw.clipping_image_url);
-  const validThrough = toDayString(pickString(raw.valid_to, raw.available_to, raw.validThrough));
+  const image = pickString(
+    raw.cutout_image_url,
+    raw.clean_image_url,
+    raw.clipping_image_url,
+  );
+  const validThrough = toDayString(
+    pickString(raw.valid_to, raw.available_to, raw.validThrough),
+  );
   const id =
-    pickString(String(raw.id ?? ""), String(raw.flyer_item_id ?? "")) || stableDealID([title, brand]);
+    pickString(String(raw.id ?? ""), String(raw.flyer_item_id ?? "")) ||
+    stableDealID([title, brand]);
 
   return {
     id,
@@ -152,7 +159,10 @@ function normalizeFlippItem(raw: Record<string, unknown>): PublixDeal | null {
 }
 
 function isBOGOItem(raw: Record<string, unknown>): boolean {
-  return isBOGOPromoText(pickString(raw.name, raw.short_name)) || isBOGOPromoText(pickString(raw.sale_story));
+  return (
+    isBOGOPromoText(pickString(raw.name, raw.short_name)) ||
+    isBOGOPromoText(pickString(raw.sale_story))
+  );
 }
 
 function dedupeDeals(deals: PublixDeal[]): PublixDeal[] {
@@ -168,7 +178,7 @@ function dedupeDeals(deals: PublixDeal[]): PublixDeal[] {
 }
 
 function loadFixtureCatalog(storeNumber: string): PublixBOGOCatalog {
-  const parsed = JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as PublixBOGOCatalog;
+  const parsed = structuredClone(fixtureCatalog) as PublixBOGOCatalog;
   return {
     ...parsed,
     storeNumber: normalizeStoreNumber(storeNumber) || parsed.storeNumber,
@@ -186,7 +196,11 @@ function readCache(storeNumber: string): PublixBOGOCatalog | null {
   return row.payload;
 }
 
-function writeCache(env: Env, storeNumber: string, payload: PublixBOGOCatalog): void {
+function writeCache(
+  env: Env,
+  storeNumber: string,
+  payload: PublixBOGOCatalog,
+): void {
   bogoCache.set(`bogo:${storeNumber}`, {
     expiresAt: Date.now() + cacheTTL(env),
     payload,
@@ -207,7 +221,10 @@ export async function findStoresByZip(zipCode: string): Promise<PublixStore[]> {
   url.searchParams.set("isWebsite", "true");
   url.searchParams.set("zipCode", zip);
 
-  const response = await fetch(url, { headers: PUBLIX_HEADERS });
+  const response = await fetch(url, {
+    headers: PUBLIX_HEADERS,
+    signal: AbortSignal.timeout(12000),
+  });
   if (!response.ok) {
     throw Object.assign(new Error(`publix_store_locator_${response.status}`), {
       code: "upstream",
@@ -215,13 +232,17 @@ export async function findStoresByZip(zipCode: string): Promise<PublixStore[]> {
     });
   }
 
-  const body = (await response.json()) as { Stores?: Array<Record<string, unknown>> };
+  const body = (await response.json()) as {
+    Stores?: Array<Record<string, unknown>>;
+  };
   const stores = Array.isArray(body?.Stores) ? body.Stores : [];
   return stores
     .map((store) => ({
       storeNumber: normalizeStoreNumber(store.KEY) || "",
       name: pickString(store.NAME, store.SHORTNAME) || "Publix",
-      address: [store.ADDR, store.CITY, store.STATE, store.ZIP].filter(Boolean).join(", "),
+      address: [store.ADDR, store.CITY, store.STATE, store.ZIP]
+        .filter(Boolean)
+        .join(", "),
       city: pickString(store.CITY),
       state: pickString(store.STATE),
       zip: pickString(store.ZIP),
@@ -249,14 +270,21 @@ async function findPublixWeeklyAdFlyer(zip: string): Promise<FlippFlyer> {
   url.searchParams.set("locale", FLIPP_LOCALE);
   url.searchParams.set("postal_code", zip);
 
-  const response = await fetch(url, { headers: FLIPP_HEADERS });
+  const response = await fetch(url, {
+    headers: FLIPP_HEADERS,
+    signal: AbortSignal.timeout(12000),
+  });
   if (!response.ok) {
     throw upstreamError(`flipp_flyers_${response.status}`, response.status);
   }
 
-  const body = (await response.json()) as { flyers?: FlippFlyer[] } | FlippFlyer[];
+  const body = (await response.json()) as
+    | { flyers?: FlippFlyer[] }
+    | FlippFlyer[];
   const flyers = Array.isArray(body) ? body : (body.flyers ?? []);
-  const publix = flyers.filter((flyer) => flyer.merchant_id === PUBLIX_FLIPP_MERCHANT_ID);
+  const publix = flyers.filter(
+    (flyer) => flyer.merchant_id === PUBLIX_FLIPP_MERCHANT_ID,
+  );
 
   // Prefer the English "Weekly Ad"; skip the Spanish "Anuncio Semanal" duplicate
   // and the "Extra Savings"/"Liquor" flyers when a weekly ad is present.
@@ -271,18 +299,29 @@ async function findPublixWeeklyAdFlyer(zip: string): Promise<FlippFlyer> {
   return weekly;
 }
 
-async function fetchFlyerItems(flyerId: number, zip: string): Promise<Record<string, unknown>[]> {
+async function fetchFlyerItems(
+  flyerId: number,
+  zip: string,
+): Promise<Record<string, unknown>[]> {
   const url = new URL(`${FLIPP_BASE_URL}/flyers/${flyerId}`);
   url.searchParams.set("locale", FLIPP_LOCALE);
   url.searchParams.set("postal_code", zip);
 
-  const response = await fetch(url, { headers: FLIPP_HEADERS });
+  const response = await fetch(url, {
+    headers: FLIPP_HEADERS,
+    signal: AbortSignal.timeout(12000),
+  });
   if (!response.ok) {
-    throw upstreamError(`flipp_flyer_items_${response.status}`, response.status);
+    throw upstreamError(
+      `flipp_flyer_items_${response.status}`,
+      response.status,
+    );
   }
 
   const body = (await response.json()) as { items?: unknown };
-  return Array.isArray(body?.items) ? (body.items as Record<string, unknown>[]) : [];
+  return Array.isArray(body?.items)
+    ? (body.items as Record<string, unknown>[])
+    : [];
 }
 
 async function fetchWeeklyAdDeals(zip: string): Promise<{
@@ -312,17 +351,22 @@ async function fetchWeeklyAdDeals(zip: string): Promise<{
 export async function fetchBOGOCatalog(
   env: Env,
   storeNumberRaw: string,
-  { zip = "", forceRefresh = false }: { zip?: string; forceRefresh?: boolean } = {},
+  {
+    zip = "",
+    forceRefresh = false,
+  }: { zip?: string; forceRefresh?: boolean } = {},
 ): Promise<PublixBOGOCatalog> {
   const storeNumber = normalizeStoreNumber(storeNumberRaw);
   if (!storeNumber) {
-    throw Object.assign(new Error("invalid_store_number"), { code: "invalid_store_number" });
+    throw Object.assign(new Error("invalid_store_number"), {
+      code: "invalid_store_number",
+    });
   }
 
   // Publix BOGOs are regional (shared across stores in an ad zone), so the ad is
   // resolved by ZIP. Cache by ZIP when available to share results across stores.
   const normalizedZip = /^\d{5}$/.test(zip.trim()) ? zip.trim() : null;
-  const cacheId = normalizedZip ?? storeNumber;
+  const cacheId = `${env.PUBLIX_DEALS_FIXTURE}:${storeNumber}:${normalizedZip ?? ""}`;
 
   if (!forceRefresh) {
     const cached = readCache(cacheId);
@@ -348,7 +392,9 @@ export async function fetchBOGOCatalog(
       deals: catalog.deals,
     };
     if (payload.deals.length === 0) {
-      throw Object.assign(new Error("no_bogo_deals"), { code: "no_bogo_deals" });
+      throw Object.assign(new Error("no_bogo_deals"), {
+        code: "no_bogo_deals",
+      });
     }
     writeCache(env, cacheId, payload);
     return payload;

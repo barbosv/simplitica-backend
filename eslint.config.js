@@ -5,7 +5,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["dist/**", "dist-worker/**", "node_modules/**", ".wrangler/**", ".superpowers/**"],
   },
   {
     files: ["src/**/*.ts", "test/**/*.ts"],
@@ -17,6 +17,12 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
+  },
+  {
+    files: ["src/worker.ts", "src/worker/**/*.ts", "test/worker/**/*.ts"],
+    languageOptions: {
+      parserOptions: { projectService: false, project: "./tsconfig.worker.json" },
     },
   },
 );

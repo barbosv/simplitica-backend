@@ -1,0 +1,18 @@
+# Copy to .dev.vars for local work. Never commit real values.
+NODE_ENV=development
+APPLE_ENVIRONMENT=Sandbox
+STRIPE_MODE=test
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_SECRET_KEY_LIVE=
+STRIPE_WEBHOOK_SECRET_LIVE=
+STRIPE_CONNECT_RETURN_URL=https://simpli-invoice.simplitica.co/stripe/return
+STRIPE_CONNECT_REFRESH_URL=https://simpli-invoice.simplitica.co/stripe/refresh
+SIMPLI_INVOICE_BUNDLE_ID=co.simplitica.simpli-invoice
+SIMPLI_INVOICE_APP_APPLE_ID=
+SIMPLITICA_CLIENT_API_KEY=
+SIMPLILIST_BACKEND_API_KEY=
+RETAILERAPI_KEY=
+HOME_DEPOT_DATA_API_KEY=
+BLS_API_KEY=
+PUBLIX_DEALS_FIXTURE=false

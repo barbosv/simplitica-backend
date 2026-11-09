@@ -11,7 +11,11 @@ export function getStripe(env: Env): Stripe {
     throw new Error("Stripe is not configured");
   }
   if (!stripeClient || stripeClientKey !== key) {
-    stripeClient = new Stripe(key);
+    stripeClient = new Stripe(key, {
+      httpClient: Stripe.createFetchHttpClient(),
+      timeout: 30_000,
+      maxNetworkRetries: 1,
+    });
     stripeClientKey = key;
   }
   return stripeClient;

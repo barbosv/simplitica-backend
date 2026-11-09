@@ -9,7 +9,14 @@
     "start": "node dist/src/server.js",
     "migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit",
+    "dev:worker": "wrangler dev",
+    "build:worker": "tsc -p tsconfig.worker.json --noEmit && wrangler deploy --env=\"\" --dry-run --outdir dist-worker",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --env=\"\"",
+    "db:migrate:staging": "node scripts/prepare-worker-config.mjs staging .wrangler/deploy-staging.json && wrangler d1 migrations apply DB --remote --config .wrangler/deploy-staging.json",
+    "db:migrate:production": "node scripts/prepare-worker-config.mjs production .wrangler/deploy-production.json && wrangler d1 migrations apply DB --remote --config .wrangler/deploy-production.json"
   },
   "repository": {
     "type": "git",
@@ -29,19 +36,25 @@
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
     "fastify": "^5.8.5",
+    "hono": "^4.13.17",
     "jose": "^6.2.2",
     "pg": "^8.21.0",
     "stripe": "^22.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.1",
+    "@cloudflare/workers-types": "^5.20261109.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
     "eslint": "^10.2.1",
+    "jsonc-parser": "^3.3.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "wrangler": "^4.159.0",
+    "yaml": "^2.9.1"
   }
 }

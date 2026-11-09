@@ -1,25 +1,36 @@
-import type { FastifyInstance } from "fastify";
+import type { ApiRouter } from "../http.js";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import type { AppContext } from "../db/context.js";
 import { isStripeConfigured } from "../env.js";
 import { getStripe } from "../stripe/client.js";
-import { businessStatusResponse, syncBusinessFromStripeAccount } from "../stripe/connect.js";
+import {
+  businessStatusResponse,
+  syncBusinessFromStripeAccount,
+} from "../stripe/connect.js";
 import { createCheckoutSession } from "../stripe/checkout.js";
 import { requireBusinessId } from "../middleware/business-id.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
 
-function stripeUnavailable(reply: import("fastify").FastifyReply) {
+function stripeUnavailable(reply: import("../http.js").ApiReply) {
   return reply.code(503).send({ error: "Stripe unavailable" });
 }
 
-export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env, ctx: AppContext) {
+export async function registerStripeConnectRoutes(
+  app: ApiRouter,
+  env: Env,
+  ctx: AppContext,
+) {
   const stripeConfigured = isStripeConfigured(env);
   const stripe = stripeConfigured ? getStripe(env) : null;
 
   app.post("/v1/stripe/connect/onboard", async (req, reply) => {
     if (!requireBusinessId(req, reply)) return;
-    if (!stripe || !env.STRIPE_CONNECT_RETURN_URL || !env.STRIPE_CONNECT_REFRESH_URL) {
+    if (
+      !stripe ||
+      !env.STRIPE_CONNECT_RETURN_URL ||
+      !env.STRIPE_CONNECT_REFRESH_URL
+    ) {
       return stripeUnavailable(reply);
     }
 
@@ -46,7 +57,9 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
 
       return {
         onboardingUrl: link.url,
-        expiresAt: link.expires_at ? new Date(link.expires_at * 1000).toISOString() : undefined,
+        expiresAt: link.expires_at
+          ? new Date(link.expires_at * 1000).toISOString()
+          : undefined,
       };
     } catch (err) {
       req.log.error({ err }, "stripe onboard failed");
@@ -78,7 +91,9 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
       let dashboardUrl: string | null = business.dashboardUrl;
       if (snapshot.connectState === "active") {
         try {
-          const login = await stripe.accounts.createLoginLink(business.stripeAccountId);
+          const login = await stripe.accounts.createLoginLink(
+            business.stripeAccountId,
+          );
           dashboardUrl = login.url;
         } catch {
           dashboardUrl = business.dashboardUrl;
@@ -107,18 +122,36 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
   app.post("/v1/invoices/:invoiceId/payment-link", async (req, reply) => {
     if (!requireBusinessId(req, reply)) return;
     if (!stripe) return stripeUnavailable(reply);
-    const invoiceId = (req.params as { invoiceId: string }).invoiceId.toLowerCase();
+    const invoiceId = (
+      req.params as { invoiceId: string }
+    ).invoiceId.toLowerCase();
     if (!z.string().uuid().safeParse(invoiceId).success) {
       return reply.code(400).send({ error: "Invalid invoice id" });
     }
 
     const idempotencyKey = req.headers["idempotency-key"];
-    const idem = Array.isArray(idempotencyKey) ? idempotencyKey[0] : idempotencyKey;
+    const idem = Array.isArray(idempotencyKey)
+      ? idempotencyKey[0]
+      : idempotencyKey;
     if (!idem) {
       return reply.code(400).send({ error: "Missing Idempotency-Key" });
     }
 
     const existing = await ctx.repos.invoicePayments.getByIdempotencyKey(idem);
+    if (
+      existing &&
+      (existing.businessId !== req.businessId ||
+        existing.invoiceId !== invoiceId)
+    ) {
+      return reply
+        .code(409)
+        .send({ error: "Idempotency-Key belongs to another invoice" });
+    }
+    const current =
+      existing ??
+      (await ctx.repos.invoicePayments.get(req.businessId, invoiceId));
+    if (current?.status === "paid")
+      return reply.code(409).send({ error: "Invoice is already paid" });
     if (existing && existing.paymentUrl && existing.checkoutSessionId) {
       return {
         paymentUrl: existing.paymentUrl,
@@ -131,8 +164,14 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
     if (!body) return reply.code(400).send({ error: "Invalid request body" });
 
     const business = await ctx.repos.businesses.getByBusinessId(req.businessId);
-    if (!business?.stripeAccountId || business.connectState !== "active" || !business.chargesEnabled) {
-      return reply.code(400).send({ error: "Stripe Connect account is not ready for payments" });
+    if (
+      !business?.stripeAccountId ||
+      business.connectState !== "active" ||
+      !business.chargesEnabled
+    ) {
+      return reply
+        .code(400)
+        .send({ error: "Stripe Connect account is not ready for payments" });
     }
 
     try {
@@ -158,7 +197,7 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
         ? new Date(session.expires_at * 1000).toISOString()
         : null;
 
-      await ctx.repos.invoicePayments.upsert({
+      const saved = await ctx.repos.invoicePayments.upsert({
         businessId: req.businessId,
         invoiceId,
         idempotencyKey: idem,
@@ -172,6 +211,8 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
         paidAt: null,
         expiresAt,
       });
+      if (saved.status === "paid")
+        return reply.code(409).send({ error: "Invoice is already paid" });
 
       return {
         paymentUrl,
@@ -187,19 +228,31 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
   app.get("/v1/invoices/:invoiceId/payment-status", async (req, reply) => {
     if (!requireBusinessId(req, reply)) return;
     if (!stripe) return stripeUnavailable(reply);
-    const invoiceId = (req.params as { invoiceId: string }).invoiceId.toLowerCase();
+    const invoiceId = (
+      req.params as { invoiceId: string }
+    ).invoiceId.toLowerCase();
     if (!z.string().uuid().safeParse(invoiceId).success) {
       return reply.code(400).send({ error: "Invalid invoice id" });
     }
 
-    let payment = await ctx.repos.invoicePayments.get(req.businessId, invoiceId);
+    let payment = await ctx.repos.invoicePayments.get(
+      req.businessId,
+      invoiceId,
+    );
     if (!payment) {
-      return { status: "unpaid", paidAt: undefined, amountCents: undefined, sessionId: undefined };
+      return {
+        status: "unpaid",
+        paidAt: undefined,
+        amountCents: undefined,
+        sessionId: undefined,
+      };
     }
 
     if (payment.status !== "paid" && payment.checkoutSessionId) {
       try {
-        const business = await ctx.repos.businesses.getByBusinessId(req.businessId);
+        const business = await ctx.repos.businesses.getByBusinessId(
+          req.businessId,
+        );
         if (business?.stripeAccountId) {
           const session = await stripe.checkout.sessions.retrieve(
             payment.checkoutSessionId,
@@ -208,13 +261,14 @@ export async function registerStripeConnectRoutes(app: FastifyInstance, env: Env
           );
           if (session.payment_status === "paid") {
             const paidAt = new Date().toISOString();
-            payment = (await ctx.repos.invoicePayments.markPaid({
-              businessId: req.businessId,
-              invoiceId,
-              paidAt,
-              sessionId: session.id,
-              amountCents: session.amount_total ?? payment.amountCents,
-            })) ?? payment;
+            payment =
+              (await ctx.repos.invoicePayments.markPaid({
+                businessId: req.businessId,
+                invoiceId,
+                paidAt,
+                sessionId: session.id,
+                amountCents: session.amount_total ?? payment.amountCents,
+              })) ?? payment;
           }
         }
       } catch (err) {

@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "simplitica-backend-local",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": {
+    "node-fetch": "./src/worker/node-fetch.cjs",
+  },
+  "vars": {
+    "NODE_ENV": "development",
+    "APPLE_ENVIRONMENT": "Sandbox",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "simplitica-local",
+      "database_id": "local-only",
+      "migrations_dir": "migrations/d1",
+    },
+  ],
+  "env": {
+    "staging": {
+      "name": "simplitica-backend-staging",
+      "vars": {
+        "NODE_ENV": "production",
+        "APPLE_ENVIRONMENT": "Sandbox",
+        "STRIPE_MODE": "test",
+        "STRIPE_CONNECT_RETURN_URL": "https://simpli-invoice.simplitica.co/stripe/return",
+        "STRIPE_CONNECT_REFRESH_URL": "https://simpli-invoice.simplitica.co/stripe/refresh",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "simplitica-staging",
+          "migrations_dir": "migrations/d1",
+        },
+      ],
+    },
+    "production": {
+      "name": "simplitica-backend",
+      "vars": {
+        "NODE_ENV": "production",
+        "APPLE_ENVIRONMENT": "Production",
+        "STRIPE_MODE": "test",
+        "STRIPE_CONNECT_RETURN_URL": "https://simpli-invoice.simplitica.co/stripe/return",
+        "STRIPE_CONNECT_REFRESH_URL": "https://simpli-invoice.simplitica.co/stripe/refresh",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "simplitica-production",
+          "migrations_dir": "migrations/d1",
+        },
+      ],
+    },
+  },
+}

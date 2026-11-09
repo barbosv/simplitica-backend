@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { ApiRouter } from "../http.js";
 
 const baseStyles = `
     body {
@@ -62,7 +62,11 @@ function contractorHandoffPage(
 }
 
 /** Customer Checkout receipt — no app install or deep link. */
-function customerReceiptPage(title: string, message: string, footer: string): string {
+function customerReceiptPage(
+  title: string,
+  message: string,
+  footer: string,
+): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,7 +86,7 @@ function customerReceiptPage(title: string, message: string, footer: string): st
 }
 
 /** Stripe Connect Account Links redirect here after onboarding (HTTPS required by Stripe). */
-export function registerStripeConnectLandingRoutes(app: FastifyInstance): void {
+export function registerStripeConnectLandingRoutes(app: ApiRouter): void {
   app.get("/stripe/return", async (_req, reply) => {
     return reply
       .type("text/html; charset=utf-8")
