@@ -71,6 +71,11 @@ const config = {
     jsrsasign: resolve(root, source.alias.jsrsasign),
   },
   vars,
+  workers_dev: true,
+  routes:
+    target === "staging"
+      ? [{ pattern: "simpli-invoice-staging.simplitica.co/*", zone_name: "simplitica.co" }]
+      : undefined,
   triggers: { crons: ["*/5 * * * *"] },
   d1_databases: [
     {

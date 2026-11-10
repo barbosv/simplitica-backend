@@ -36,7 +36,7 @@
 				{
 					"binding": "DB",
 					"database_name": "simplitica-staging",
-					"database_id": "cda19988-8c42-4006-b3b7-f680a2475d41",
+					"database_id": "2e7006b2-b267-47a8-ad49-603816cf1577",
 					"migrations_dir": "migrations/d1",
 				},
 			],
