@@ -74,8 +74,18 @@ const config = {
   workers_dev: true,
   routes:
     target === "staging"
-      ? [{ pattern: "simpli-invoice-staging.simplitica.co/*", zone_name: "simplitica.co" }]
-      : undefined,
+      ? [
+          {
+            pattern: "simpli-invoice-staging.simplitica.co/*",
+            zone_name: "simplitica.co",
+          },
+        ]
+      : [
+          {
+            pattern: "simpli-invoice.simplitica.co/*",
+            zone_name: "simplitica.co",
+          },
+        ],
   triggers: { crons: ["*/5 * * * *"] },
   d1_databases: [
     {

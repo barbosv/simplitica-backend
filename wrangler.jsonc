@@ -54,6 +54,7 @@
 				{
 					"binding": "DB",
 					"database_name": "simplitica-production",
+					"database_id": "adf03da8-a643-44fa-9f3f-919908607aa9",
 					"migrations_dir": "migrations/d1",
 				},
 			],
