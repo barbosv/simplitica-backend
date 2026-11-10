@@ -5,7 +5,14 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "dist-worker/**", "node_modules/**", ".wrangler/**", ".superpowers/**"],
+    ignores: [
+      "dist/**",
+      "dist-worker/**",
+      "node_modules/**",
+      ".wrangler/**",
+      ".superpowers/**",
+      "src/worker/vendor/**",
+    ],
   },
   {
     files: ["src/**/*.ts", "test/**/*.ts"],

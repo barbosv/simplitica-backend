@@ -8,3 +8,4 @@ dist-worker/
 .wrangler/
 .dev.vars*
 !.dev.vars.example
+src/worker/vendor/

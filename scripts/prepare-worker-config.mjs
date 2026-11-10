@@ -66,7 +66,10 @@ const config = {
   account_id: account,
   compatibility_date: source.compatibility_date,
   compatibility_flags: source.compatibility_flags,
-  alias: { "node-fetch": resolve(root, source.alias["node-fetch"]) },
+  alias: {
+    "node-fetch": resolve(root, source.alias["node-fetch"]),
+    jsrsasign: resolve(root, source.alias.jsrsasign),
+  },
   vars,
   triggers: { crons: ["*/5 * * * *"] },
   d1_databases: [

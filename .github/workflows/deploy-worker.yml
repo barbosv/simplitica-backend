@@ -45,6 +45,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run patch:jsrsasign
       - name: Validate deployment inputs
         env:
           TARGET: ${{ inputs.target }}
