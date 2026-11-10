@@ -183,11 +183,29 @@ export async function createWorkerApp(bindings: WorkerBindings) {
   return app;
 }
 
+/** One Hono app per isolate; Cloudflare keeps the same bindings object for the isolate lifetime. */
+let cachedApp: {
+  bindings: WorkerBindings;
+  app: Awaited<ReturnType<typeof createWorkerApp>>;
+} | null = null;
+
+export function resetWorkerAppCacheForTests(): void {
+  cachedApp = null;
+}
+
+async function getWorkerApp(bindings: WorkerBindings) {
+  if (cachedApp?.bindings === bindings) return cachedApp.app;
+  const app = await createWorkerApp(bindings);
+  cachedApp = { bindings, app };
+  return app;
+}
+
 export default {
   async fetch(request: Request, bindings: WorkerBindings): Promise<Response> {
     try {
-      return await (await createWorkerApp(bindings)).fetch(request);
+      return await (await getWorkerApp(bindings)).fetch(request);
     } catch {
+      cachedApp = null;
       return Response.json(
         { error: "Backend configuration unavailable" },
         { status: 503 },

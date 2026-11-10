@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { env as workerEnv } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
-import worker from "../../src/worker.js";
+import worker, { resetWorkerAppCacheForTests } from "../../src/worker.js";
 import { createD1Repositories } from "../../src/db/repositories/d1.js";
 import { processD1StripeEvent } from "../../src/db/d1-events.js";
 import type Stripe from "stripe";
@@ -11,6 +11,7 @@ const env = workerEnv as {
   TEST_MIGRATIONS: import("@cloudflare/vitest-plugin").D1Migration[];
 };
 beforeEach(async () => {
+  resetWorkerAppCacheForTests();
   resetStripeClientForTests();
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 });

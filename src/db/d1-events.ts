@@ -15,6 +15,8 @@ export async function processD1StripeEvent(
         values: unknown[];
         set: string;
         updates: unknown[];
+        /** When false, ack even if no row matches (Express account.updated no-op). */
+        required: boolean;
       }
     | undefined;
   if (event.type === "account.updated") {
@@ -29,6 +31,8 @@ export async function processD1StripeEvent(
         Number(Boolean(account.charges_enabled)),
         Number(Boolean(account.payouts_enabled)),
       ],
+      // Match Express: early Connect events before the business is linked are acked, not retried.
+      required: false,
     };
   } else if (
     [
@@ -57,6 +61,7 @@ export async function processD1StripeEvent(
           session.id,
           session.amount_total ?? null,
         ],
+        required: true,
       };
     }
   } else if (event.type === "payment_intent.succeeded") {
@@ -68,17 +73,23 @@ export async function processD1StripeEvent(
         values: [intent.metadata.businessId, intent.metadata.invoiceId],
         set: "status='paid',paid_at=?,amount_cents=COALESCE(?,amount_cents)",
         updates: [new Date().toISOString(), intent.amount_received ?? null],
+        required: true,
       };
     }
   }
-  const exists = target
-    ? ` WHERE EXISTS(SELECT 1 FROM ${target.table} WHERE ${target.where})`
-    : "";
+  const exists =
+    target?.required === true
+      ? ` WHERE EXISTS(SELECT 1 FROM ${target.table} WHERE ${target.where})`
+      : "";
   const insert = db
     .prepare(
       `INSERT INTO stripe_events(event_id,type) SELECT ?,?${exists} ON CONFLICT(event_id) DO NOTHING RETURNING event_id`,
     )
-    .bind(event.id, event.type, ...(target?.values ?? []));
+    .bind(
+      event.id,
+      event.type,
+      ...(target?.required === true ? (target.values ?? []) : []),
+    );
   const statements = [insert];
   if (target) {
     // SQLite changes() reads the INSERT immediately before this UPDATE in the batch.

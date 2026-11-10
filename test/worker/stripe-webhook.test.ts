@@ -126,3 +126,74 @@ it("ignores unpaid checkout events and accepts unknown events idempotently", asy
   expect(await processD1StripeEvent(env.DB, event)).toBe("processed");
   expect(await processD1StripeEvent(env.DB, event)).toBe("duplicate");
 });
+
+it("acks account.updated when no business is linked yet", async () => {
+  const event = {
+    id: "evt_" + crypto.randomUUID(),
+    type: "account.updated",
+    data: {
+      object: {
+        id: "acct_missing",
+        charges_enabled: true,
+        payouts_enabled: true,
+        details_submitted: true,
+      },
+    },
+  } as unknown as Stripe.Event;
+  expect(await processD1StripeEvent(env.DB, event)).toBe("processed");
+  expect(
+    await env.DB.prepare("SELECT type FROM stripe_events WHERE event_id=?")
+      .bind(event.id)
+      .first(),
+  ).toEqual({ type: "account.updated" });
+  expect(await processD1StripeEvent(env.DB, event)).toBe("duplicate");
+});
+
+it("updates a linked business from account.updated", async () => {
+  const repos = createD1Repositories(env.DB);
+  const businessId = crypto.randomUUID();
+  await repos.businesses.getOrCreate(businessId);
+  await repos.businesses.update(businessId, { stripeAccountId: "acct_linked" });
+  const event = {
+    id: "evt_" + crypto.randomUUID(),
+    type: "account.updated",
+    data: {
+      object: {
+        id: "acct_linked",
+        charges_enabled: true,
+        payouts_enabled: true,
+        details_submitted: true,
+      },
+    },
+  } as unknown as Stripe.Event;
+  expect(await processD1StripeEvent(env.DB, event)).toBe("processed");
+  expect(await repos.businesses.getByBusinessId(businessId)).toMatchObject({
+    connectState: "active",
+    chargesEnabled: true,
+    payoutsEnabled: true,
+  });
+});
+
+it("retries payment webhooks until the invoice row exists", async () => {
+  const event = {
+    id: "evt_" + crypto.randomUUID(),
+    type: "payment_intent.succeeded",
+    data: {
+      object: {
+        metadata: {
+          businessId: crypto.randomUUID(),
+          invoiceId: crypto.randomUUID(),
+        },
+        amount_received: 100,
+      },
+    },
+  } as unknown as Stripe.Event;
+  await expect(processD1StripeEvent(env.DB, event)).rejects.toThrow(
+    /not available yet/,
+  );
+  expect(
+    await env.DB.prepare("SELECT 1 FROM stripe_events WHERE event_id=?")
+      .bind(event.id)
+      .first(),
+  ).toBeNull();
+});
