@@ -4,6 +4,7 @@
   "main": "src/worker/qualification/index.ts",
   "compatibility_date": "2026-11-09",
   "workers_dev": true,
+  "secrets": { "required": [] },
   "vars": {
     "QUALIFY_ENVIRONMENT": "development",
     "QUALIFY_ISSUER": "https://dev-i8usug5fp48kepvr.us.auth0.com/",

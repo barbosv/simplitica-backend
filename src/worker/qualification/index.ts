@@ -3,6 +3,10 @@ import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { z } from "zod";
 
 const MAX_BODY_BYTES = 64 * 1024;
+const BODY_READ_TIMEOUT_MS = 2000;
+class BodyReadInterrupted extends Error {
+  constructor(readonly status: 408 | 499) { super("Body read interrupted"); }
+}
 const configSchema = z.strictObject({
   QUALIFY_ENVIRONMENT: z.literal("development"),
   QUALIFY_ISSUER: z.string().min(1),
@@ -15,7 +19,7 @@ type Configuration = z.infer<typeof configSchema>;
 
 function httpsUrl(value: string): URL {
   const url = new URL(value);
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.href !== value) {
+  if (url.protocol !== "https:" || url.username || url.password || `${url.origin}${url.pathname}` !== value) {
     throw new Error("Invalid configuration");
   }
   return url;
@@ -65,18 +69,33 @@ async function boundedBody(request: Request): Promise<string | null> {
   if (!reader) return "";
   const chunks: Uint8Array[] = [];
   let size = 0;
-  try {
+  let finished = false;
+  let onAbort = () => {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const signal = request.signal;
+  const interrupted = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new BodyReadInterrupted(408)), BODY_READ_TIMEOUT_MS);
+    onAbort = () => reject(new BodyReadInterrupted(499));
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+  const read = async () => {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) { finished = true; return true; }
       size += value.byteLength;
-      if (size > MAX_BODY_BYTES) {
-        await reader.cancel();
-        return null;
-      }
+      if (size > MAX_BODY_BYTES) return false;
       chunks.push(value);
     }
+  };
+  try {
+    if (!await Promise.race([read(), interrupted])) return null;
   } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", onAbort);
+    // Cancel is best effort: a producer's cancel() promise may never settle. No response
+    // or request lifetime depends on it; the pending reader is released even in that case.
+    if (!finished) void reader.cancel().catch(() => {});
     reader.releaseLock();
   }
   const bytes = new Uint8Array(size);
@@ -138,17 +157,19 @@ export function createQualificationProbe(fetchJwks: typeof fetch = fetch) {
         if (!scopes.includes("probe:read")) return challenge(config, true);
         authInfo = { token: bearer, clientId: config.QUALIFY_CLIENT_ID, scopes, expiresAt: payload.exp, resource: new URL(config.QUALIFY_MCP_AUDIENCE) };
       } catch { return challenge(config); }
-      let body: string | null;
+      let parsedBody: unknown;
       try {
-        body = await boundedBody(request);
+        const body = await boundedBody(request);
         if (body === null) return errorResponse(413, "Request too large");
-        JSON.parse(body);
-      } catch { return errorResponse(400, "Invalid request"); }
-      const headers = new Headers(request.headers);
-      headers.delete("content-length");
+        parsedBody = JSON.parse(body);
+      } catch (error) {
+        if (error instanceof BodyReadInterrupted) return errorResponse(error.status, error.status === 408 ? "Request timed out" : "Request aborted");
+        return errorResponse(400, "Invalid request");
+      }
+      if (request.signal.aborted) return errorResponse(499, "Request aborted");
       // Modern requests use JSON; the SDK's 2025 compatibility leg emits finite SSE.
       const handler = createMcpHandler(server, { responseMode: "json", maxSubscriptions: 0, keepAliveMs: 0, maxRequestBodySize: MAX_BODY_BYTES });
-      return handler.fetch(new Request(request.url, { method: "POST", headers, body }), { authInfo });
+      return handler.fetch(request, { authInfo, parsedBody });
     },
   };
 }

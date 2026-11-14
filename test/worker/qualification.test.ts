@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { exportJWK, generateKeyPair, SignJWT, type JWTPayload } from "jose";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT, type JWTPayload } from "jose";
 import probe, { createQualificationProbe } from "../../src/worker/qualification/index.js";
 
 const config = {
@@ -62,7 +62,9 @@ describe("isolated qualification probe", () => {
   it.each([
     {}, { QUALIFY_ENVIRONMENT: "production" }, { QUALIFY_ISSUER: "http://issuer.test/" },
     { QUALIFY_ISSUER: "https://issuer.test" }, { QUALIFY_MCP_AUDIENCE: "http://probe.test/mcp" },
-    { QUALIFY_MCP_AUDIENCE: "https://probe.test/mcp?x=1" }, { QUALIFY_CLIENT_ID: "" }, { QUALIFY_CLIENT_ID: "REPLACE_WITH_DEVELOPMENT_CLIENT_ID" }, { QUALIFY_CLIENT_ID: " third-party-client " },
+    { QUALIFY_MCP_AUDIENCE: "https://probe.test/mcp?x=1" }, { QUALIFY_MCP_AUDIENCE: "https://probe.test/mcp?" }, { QUALIFY_MCP_AUDIENCE: "https://probe.test/mcp#" },
+    { QUALIFY_ISSUER: "https://issuer.test/?" }, { QUALIFY_ISSUER: "https://issuer.test/#" },
+    { QUALIFY_APPLE_IDENTITY_CLAIM: "https://probe.test/apple?" }, { QUALIFY_APPLE_IDENTITY_CLAIM: "https://probe.test/apple#" }, { QUALIFY_CLIENT_ID: "" }, { QUALIFY_CLIENT_ID: "REPLACE_WITH_DEVELOPMENT_CLIENT_ID" }, { QUALIFY_CLIENT_ID: " third-party-client " },
     { QUALIFY_APPLE_IDENTITY_CLAIM: "sub" }, { QUALIFY_PROBE_SCOPE: "write:all" }, { DB: {} },
   ])("fails closed on invalid configuration %j", async (patch) => {
     const env = Object.keys(patch).length ? { ...config, ...patch } : {};
@@ -115,12 +117,30 @@ describe("isolated qualification probe", () => {
     const payload = await rpc(response);
     expect(payload.result.tools[0].name).toBe("qualification_probe");
   });
-  it("rejects invalid signature and non-RS256 algorithm", async () => {
+  it("rejects invalid signature", async () => {
     const worker = createQualificationProbe(network());
     expect((await worker.fetch(request("tools/list", await token()), config)).status).toBe(200);
     expect((await worker.fetch(request("tools/list", await token({}, otherKeys.privateKey)), config)).status).toBe(401);
-    const hs = await new SignJWT({}).setProtectedHeader({ alg: "HS256" }).sign(new Uint8Array(32));
-    expect((await worker.fetch(request("tools/list", hs), config)).status).toBe(401);
+  });
+  it("rejects an otherwise valid ES256 token with its matching JWKS", async () => {
+    const alternateKeys = await generateKeyPair("ES256");
+    const alternateJwks = { keys: [{ ...await exportJWK(alternateKeys.publicKey), alg: "ES256", kid: "test-key" }] };
+    const bearer = await token({}, alternateKeys.privateKey, "ES256");
+    const control = await jwtVerify(bearer, createLocalJWKSet(alternateJwks), {
+      algorithms: ["ES256"], issuer: "https://issuer.test/", audience: "https://probe.test/mcp", requiredClaims: ["exp", "sub"],
+    });
+    expect(control.payload).toMatchObject({ sub: "auth0|private-subject", azp: "third-party-client", scope: "probe:read", "https://simplitica.co/apple-sub": "private-apple-subject" });
+    const response = await createQualificationProbe(network(alternateJwks)).fetch(request("tools/list", bearer), config);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('{"error":"Unauthorized"}');
+  });
+  it("rejects a well-formed unsecured JWT with otherwise valid claims", async () => {
+    const signed = await token();
+    const encodedHeader = btoa(JSON.stringify({ alg: "none" })).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const unsigned = `${encodedHeader}.${signed.split(".")[1]}.`;
+    const response = await createQualificationProbe(network()).fetch(request("tools/list", unsigned), config);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('{"error":"Unauthorized"}');
   });
   it.each([undefined, "", "other:read", "probe:reader", ["probe:read"]])("requires exact scope after verifying token (%j)", async (scope) => {
     const response = await createQualificationProbe(network()).fetch(request("tools/call", await token({ scope })), config);
@@ -152,6 +172,89 @@ describe("isolated qualification probe", () => {
     const response = await createQualificationProbe(network()).fetch(request("tools/list", await token(), { body: " ".repeat(65537), headers: length ? { "content-length": length } : {} }), config);
     expect(response.status).toBe(413);
     await response.text();
+  });
+  it("times out an incomplete upload despite continued slow progress", async () => {
+    let producer: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start(controller) { producer = controller; controller.enqueue(new TextEncoder().encode("{")); } });
+    const slow = setInterval(() => producer.enqueue(new TextEncoder().encode(" ")), 300);
+    const pending = createQualificationProbe(network()).fetch(request("tools/list", await token(), { body }), config);
+    const started = Date.now();
+    try {
+      const response = await Promise.race([pending, new Promise<null>(resolve => setTimeout(() => resolve(null), 2400))]);
+      expect(response?.status).toBe(408);
+      expect(Date.now() - started).toBeGreaterThanOrEqual(1900);
+      expect(Date.now() - started).toBeLessThan(2300);
+      expect(await response?.text()).toBe('{"error":"Request timed out"}');
+    } finally {
+      clearInterval(slow);
+      try { producer!.close(); } catch { /* The timeout may already have cancelled it. */ }
+      await pending;
+    }
+  });
+  it("returns the byte-limit error without awaiting an unresponsive cancellation", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(65537)); },
+      cancel() { return new Promise<void>(() => {}); },
+    });
+    const pending = createQualificationProbe(network()).fetch(request("tools/list", await token(), { body }), config);
+    const response = await Promise.race([pending, new Promise<null>(resolve => setTimeout(() => resolve(null), 300))]);
+    expect(response?.status).toBe(413);
+    expect(await response?.text()).toBe('{"error":"Request too large"}');
+  });
+  it("stops an incomplete upload promptly when the original request aborts", async () => {
+    let producer: ReadableStreamDefaultController<Uint8Array>;
+    const controller = new AbortController();
+    let notifyRead = () => {};
+    const reading = new Promise<void>(resolve => { notifyRead = resolve; });
+    const body = new ReadableStream<Uint8Array>({
+      start(value) { producer = value; },
+      pull() { notifyRead(); },
+      cancel() { return new Promise<void>(() => {}); },
+    }, { highWaterMark: 0 });
+    const pending = createQualificationProbe(network()).fetch(request("tools/list", await token(), { body, signal: controller.signal }), config);
+    await reading;
+    controller.abort();
+    try {
+      const response = await Promise.race([pending, new Promise<null>(resolve => setTimeout(() => resolve(null), 300))]);
+      expect(response?.status).toBe(499);
+      expect(await response?.text()).toBe('{"error":"Request aborted"}');
+    } finally {
+      try { producer!.close(); } catch { /* Abort may already have cancelled it. */ }
+      await pending;
+    }
+  });
+  it("preserves original disconnect handling in the real SDK after bounded parsing", async () => {
+    const controller = new AbortController();
+    const input = request("tools/list", await token(), { signal: controller.signal });
+    const signal = input.signal;
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    const originalAdd = signal.addEventListener.bind(signal);
+    const originalRemove = signal.removeEventListener.bind(signal);
+    let disconnects = 0;
+    const observed = new Map<EventListenerOrEventListenerObject, EventListener>();
+    const add = vi.spyOn(signal, "addEventListener").mockImplementation((type, listener, options) => {
+      if (type !== "abort") return originalAdd(type, listener, options);
+      listeners.add(listener);
+      const forwarded: EventListener = event => {
+        disconnects++;
+        if (typeof listener === "function") listener.call(signal, event);
+        else listener.handleEvent(event);
+      };
+      observed.set(listener, forwarded);
+      originalAdd(type, forwarded, options);
+    });
+    const remove = vi.spyOn(signal, "removeEventListener").mockImplementation((type, listener, options) => {
+      listeners.delete(listener);
+      originalRemove(type, observed.get(listener) ?? listener, options);
+    });
+    try {
+      const response = await createQualificationProbe(network()).fetch(input, config);
+      // The acquisition listener is removed; SDK's disconnect cleanup remains on this signal.
+      expect(listeners.size).toBeGreaterThan(0);
+      controller.abort();
+      expect(disconnects).toBeGreaterThan(0);
+      await response.text();
+    } finally { add.mockRestore(); remove.mockRestore(); }
   });
   it("does not leak untrusted malformed JSON in errors", async () => {
     const response = await createQualificationProbe(network()).fetch(request("tools/list", await token(), { body: '{"private-secret":broken' }), config);
