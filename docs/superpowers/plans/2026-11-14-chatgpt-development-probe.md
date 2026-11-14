@@ -1,64 +1,60 @@
 # ChatGPT Development MCP Probe Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking. Preserve the owner's task-by-task independent review workflow.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Preserve independent task review.
 
-**Goal:** Connect ChatGPT to an authenticated, synthetic development MCP probe without touching production.
+**Goal:** Build and push an isolated authenticated development MCP probe; subsequently connect it to ChatGPT and collect live provider qualification evidence.
 
-**Architecture:** Continue the current Hono/Workers architecture. Recover the previous OAuth qualification contract selectively and adapt its transport; use a dedicated development Worker with no production database binding, or a supported tunnel to an isolated local probe. D1 persistence tasks follow only after full live qualification.
+**Architecture:** A standalone stateless Worker uses the maintained official MCP SDK and `jose` JWT verification. No database is needed. Existing Hono production routes and D1 configuration stay unchanged. The owner authorized a new replacement because the original local probe/archive is unavailable.
 
-**Tech Stack:** TypeScript, Cloudflare Workers/workerd, existing Vitest Worker harness, maintained MCP TypeScript SDK, managed OAuth candidate Auth0.
+**Tech Stack:** TypeScript, Workers/workerd, Vitest Worker harness, maintained MCP TypeScript SDK, Auth0 development tenant.
 
 **Spec:** `docs/superpowers/specs/2026-11-14-chatgpt-workers-continuation.md`
 
 ## Global Constraints
 
-- Baseline: `34a0c8b4b9590326403c96383459cf3c33ab968a`.
+- Baseline: `34a0c8b4b9590326403c96383459cf3c33ab968a`; task base `97bf6a6`.
 - No production deployments, migrations, auth changes, or bindings.
-- No real customer data; no send/payment tools; no production owner provisioning.
-- Recover missing prior work rather than silently recreating it.
-- Provider secrets/private Apple keys belong in secure settings, never chat or committed files.
+- Only synthetic read-only data; no sending, payment or document authoring tools.
+- New replacement implementation is authorized; do not claim historical work was recovered.
+- Secrets/private keys/tokens stay out of source, logs, tool output and chat.
+- Push the reviewed `codex/chatgpt-mcp-probe` branch only, without merge or force push.
 
 ## Review Focus
 
-- Missing/wrong audience, issuer, signature, expiry or scope must deny tool access.
-- Unsupported HTTP methods and streaming lifecycle must terminate correctly.
-- OAuth metadata must match actual client-requested scopes and token audience.
-- Development configuration must contain no production binding or fallback.
-- Authentication success must not be reported as full Apple identity/revocation qualification.
+- JWT negatives must have a valid positive control and correct issuer/audience/client/scope/expiry enforcement.
+- Unsupported MCP GET/streaming methods must terminate promptly; POST response lifecycle must finish under workerd.
+- Actual requested OAuth scopes and resource must be checked live, independently of advertised provider scopes.
+- Probe configuration must never inherit production bindings or deployments.
+- Synthetic success and public discovery are not evidence for native identity, refresh/reuse or revocation gates.
 
-### Task 1: Recover evidence and prepare development tenant
+### Task 1: Replacement probe and local evidence
 
-**Files:** Recover `scripts/qualify-cloud-auth.ts`, `test/auth-provider-contract.test.ts`, and `docs/chatgpt-managed-oauth-qualification.md` into a temporary comparison checkout first. Keep evidence under ignored `.superpowers/sdd/chatgpt-integration/`.
+**Files:** `src/worker/qualification/`, `wrangler.qualify.jsonc`, `test/worker/qualification*.test.ts`, `package.json`, `package-lock.json`, isolated TypeScript/test config if required, and `docs/chatgpt-managed-oauth-qualification.md`.
 
-- [ ] Obtain the historical archive/path; inspect the complete task diff and accepted reviews before selecting files.
-- [ ] Create a dedicated Auth0 development tenant and record its nonsecret issuer domain. Owner confirmed it does not yet exist.
-- [ ] Follow current official Auth0/OpenAI docs to create separate native/ChatGPT clients, register the exact actual callback, configure Apple securely, and establish the development resource and explicit API scope.
-- [ ] Record the task base, selected files, adaptation changes and missing live gates. Review before code adaptation.
+**Interfaces:** dedicated Worker `fetch(request, env)`; one `qualification_probe` MCP tool; public protected-resource metadata; `QUALIFY_*` configuration for issuer/resource/client/scope/Apple claim and development-only operation.
 
-### Task 2: Adapt the isolated probe and verify it locally
+- [x] Reconcile Git and record owner authorization; prepare focused brief and fresh implementer.
+- [x] Write and execute failing tests for unsigned/wrong-signature, issuer/audience/client/scope/expiry/identity rejection, valid authenticated tool calls, method handling and request lifecycle.
+- [x] Implement a standalone SDK Worker with no storage binding and bounded body/JWKS handling.
+- [x] Verify the production app remains separate; run full Node/workerd suites, lint, builds, probe dry-run and diff checks.
+- [x] Document exact local setup, identity claim requirement, nonsecret provider configuration, separate development deploy/tunnel procedure and remaining live gates.
+- [ ] Commit scoped work; obtain independent spec/quality review, fix blockers and obtain scoped re-review.
+- [ ] Push the feature branch; verify its remote commit matches local HEAD.
 
-**Files:** Exact recovered interfaces and resulting file list must be recorded after Task 1; they are unavailable now. Expected Worker boundaries: a dedicated probe entry point/config, recovered JWT contract module, and `test/worker/` transport/authorization regressions. Do not wire the probe into `src/worker.ts` production routes.
+### Task 2: Development HTTPS and ChatGPT linking (not completed by a push)
 
-- [ ] Pin the recovered contracts and SDK version against current official MCP and OpenAI documentation before implementation.
-- [ ] Write/run failing workerd tests for accepted/rejected JWTs, protected-resource challenge, scope enforcement, method rejection and request lifecycle. Record RED output.
-- [ ] Implement the smallest Worker transport adaptation with synthetic read-only tool output and isolated configuration. No D1 binding is needed for this stateless milestone.
-- [ ] Run focused tests, existing Node and Worker suites, lint, Node build, Worker bundle and `git diff --check`; record actual results.
-- [ ] Commit the scoped adaptation, obtain independent spec/quality review, fix blockers and record re-review.
+- [ ] Establish a dedicated staging Worker or supported tunnel, with no production bindings. Verify the canonical domain and OAuth metadata routing.
+- [ ] Configure the development-tenant Action for the signed opaque Apple identity claim; verify exact third-party client ID copied from Auth0, not screenshot transcription.
+- [ ] Obtain exact callback from the actual ChatGPT portal and register it with the predefined client; keep API-only OIDC settings and explicit scopes.
+- [ ] Link using real Apple login and S256. Record sanitized actual resource/audience/token request evidence and a successful synthetic tool call from ChatGPT.
 
-### Task 3: Reach ChatGPT and capture actual linking evidence
+### Task 3: Complete full P1T1b qualification before dependent implementation
 
-**Files:** `docs/chatgpt-managed-oauth-qualification.md`; ignored sanitized evidence ledger.
+- [ ] Verify signed Apple identity continuity across native and hosted flows, with the approved App ID grouping; no email merging or prefix stripping.
+- [ ] Verify refresh rotation and old-token reuse rejection, with the configured overlap accounted for.
+- [ ] Verify revocation/disconnection denies subsequent refresh/access as appropriate. An unexpired JWT is not automatically revoked by this stateless probe.
+- [ ] Record explicit pass/fail evidence for all gates. Evaluate another managed issuer if required; do not bypass failures with a custom authorization server.
 
-- [ ] Establish an authorized development HTTPS endpoint via separate staging Worker or supported tunnel; inspect its target/config before publication.
-- [ ] Link the actual ChatGPT development app using the portal's exact callback and configured development client.
-- [ ] Run a protected synthetic tool from ChatGPT and confirm unauthenticated/wrong-scope denial. Capture sanitized request/resource/scope evidence without bearer tokens or personal identity payloads.
-- [ ] Record first milestone separately from pending full P1T1b Apple continuity, rotation/reuse, and revocation gates.
-- [ ] Complete full live qualification before starting owner enrollment or dependent production integration work.
+## Later D1 adaptation gate
 
-## Later plan adaptation gate
-
-Recover Parts 1–4 before rewriting their exact interfaces. Replace PostgreSQL transaction and migration assumptions task-by-task with D1 constraints/batches, conditional mutation gates, tested numbering and commit-safe feed ordering. Retain approved product behavior and native atomic outbox/number consumption requirements. Do not claim this milestone plan replaces the missing detailed plans.
-
-## Current external inputs
-
-Auth0 development tenant creation and historical archive transfer are pending. Neither local synthetic tests nor a plan can substitute for real provider/ChatGPT account access.
+Rewrite remaining account/record/sync/numbering tasks against D1 before executing them. Preserve approved interfaces where available and mark unavailable historical details honestly. Replace PostgreSQL transactions, locks and sequence assumptions with tested atomic SQL/batches and conditional mutation gates. Prove ownership uniqueness, revision/idempotency, number allocation and commit-safe feed ordering in actual D1/workerd tests. No new PostgreSQL or Cloud Run dependency.

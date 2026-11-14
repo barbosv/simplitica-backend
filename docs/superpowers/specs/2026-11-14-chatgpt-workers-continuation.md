@@ -19,7 +19,9 @@ The first milestone is an authenticated development MCP probe reachable from Cha
 
 The saved commit `47d1a3c` and branch `feat/chatgpt-integration` are absent locally. Searches of available attachments, repositories, Downloads, Desktop and Documents did not locate the bundle or original coordination artifacts. P1T1a implementation and historical review/test results are reported by the handoff, not locally recovered or freshly verified. Do not label a replacement probe as recovered or reopen resolved findings without new evidence.
 
-When the archive is available, inspect it in a separate temporary checkout. Recover design/research and the qualification contract; adapt the probe transport to Workers Request/Response where needed. Do not wholesale cherry-pick the earlier runtime/dependency lockfile. Preserve original review history alongside new adaptation evidence.
+The owner subsequently confirmed the archive is unavailable and explicitly authorized creating a replacement development probe and pushing this feature branch. Recovery is no longer a prerequisite for that task. The new implementation must be identified as a replacement, with fresh tests and review.
+
+If the archive later becomes available, inspect it in a separate temporary checkout. Recover design/research and the qualification contract; adapt the probe transport to Workers Request/Response where needed. Do not wholesale cherry-pick the earlier runtime/dependency lockfile. Preserve original review history alongside new adaptation evidence.
 
 ## Engineering adaptation requirements
 
@@ -39,3 +41,13 @@ Expose only synthetic, read-only qualification output. Public OAuth protected-re
 Use a dedicated development Auth0 tenant, separate native and ChatGPT clients, an exact portal-supplied callback URI, S256, an explicit probe API scope, and a canonical resource/audience. Apple-only owner login and stable verified identity across native and hosted login remain full qualification requirements. Do not merge by email or strip provider subject prefixes.
 
 A successful authenticated synthetic tool call from ChatGPT completes the first milestone, not all provider qualification. Full P1T1b also requires sanitized evidence for native/hosted Apple identity continuity, scope/resource mapping, refresh rotation/reuse rejection and disconnect/revocation denial. JWT validation alone cannot prove revocation handling.
+
+## Replacement probe engineering decisions
+
+- Build only a separate stateless Worker, with no D1, KV, service or production bindings. Keep existing `src/worker.ts` and production Wrangler configuration unchanged.
+- Use the official maintained MCP TypeScript server SDK with its web-standard per-request handler and `jose` verification. No hand-written OAuth authorization server or Node HTTP bridge.
+- Protect the entire `/mcp` endpoint. Public protected-resource metadata and HTTP Bearer challenges support account linking. Only one read-only synthetic `qualification_probe` tool exists; never return personal identity or token contents.
+- Require an allowlisted OAuth client (`azp`) and a namespaced Apple identity claim in a signed API token. Configure that claim through a narrowly scoped development-tenant Action. Its value is an opaque Apple identity, not an email or a stripped Auth0 subject. This still does not prove native/hosted continuity.
+- JWKS networking must use the configured HTTPS issuer with bounded timeout; do not accept caller-selected JWKS URLs. Do not change provider discovery to conceal advertised OIDC scopes or unsupported behavior.
+- Planned canonical resource: `https://simpli-invoice-mcp-dev.simplitica.co/mcp`; scope `probe:read`. The hostname is not yet provisioned. Deployment/tunnel routing must preserve that resource or deliberately recreate/reconfigure the development API if it changes.
+- Push authorization applies to the reviewed `codex/chatgpt-mcp-probe` feature branch. It does not authorize merging or production deployment.

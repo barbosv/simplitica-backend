@@ -22,3 +22,4 @@ jobs:
       - run: npm test
       - run: npm run test:worker
       - run: npm run build:worker
+      - run: npm run build:qualify

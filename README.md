@@ -4,6 +4,10 @@ Cloudflare Workers + D1 implementation: see [cutover and local development](docs
 
 Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Apple subscription sync**, **Stripe Connect** invoice payments, and **SimpliList Publix BOGO deals proxy**.
 
+## Development ChatGPT MCP probe
+
+A separate authenticated Worker exposes one synthetic read-only qualification tool, with no database binding or production routes. See the [OAuth qualification runbook](docs/chatgpt-managed-oauth-qualification.md) for development settings, local commands, staging/linking prerequisites and remaining live evidence. The probe is a replacement for the unavailable historical local implementation; it does not create invoices, enroll owners, or complete live OAuth qualification by itself.
+
 ## Features
 
 - `GET /health`, `GET /health/ready`
@@ -16,7 +20,7 @@ Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Ap
 - **SimpliList** (when `SIMPLILIST_BACKEND_API_KEY` is set):
   - `GET /v1/deals/publix/stores`, `GET /v1/deals/publix/bogo`
 
-Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for local subscription-only dev).
+Persistence: **D1** for the Cloudflare Worker. The retained legacy Node server supports PostgreSQL or file storage for comparison; new ChatGPT integration work targets Workers/D1.
 
 ### Pricing environment variables
 
