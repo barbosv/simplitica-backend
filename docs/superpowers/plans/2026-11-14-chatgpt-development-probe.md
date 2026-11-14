@@ -47,7 +47,7 @@
 - [x] Configure the development-tenant Action for the signed opaque Apple identity claim; verify exact third-party client ID copied from Auth0, not screenshot transcription.
 - [x] Obtain exact callback from the actual ChatGPT portal and register it with the predefined client; keep API-only OIDC settings and explicit scopes.
 - [x] Link using real Apple login and record a successful synthetic tool call from ChatGPT (November 14, 2026; evidence in qualification runbook).
-- [ ] Independently capture actual S256/resource/scope authorization and token-exchange evidence; the successful call does not replace this audit.
+- [x] Independently capture actual S256/resource/scope authorization and successful code-exchange evidence from Auth0 logs; controlled token lifecycle checks remain separate.
 
 ### Task 3: Complete full P1T1b qualification before dependent implementation
 
