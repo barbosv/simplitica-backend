@@ -3,6 +3,7 @@
   "name": "simplitica-mcp-probe-development",
   "main": "src/worker/qualification/index.ts",
   "compatibility_date": "2026-11-09",
+  "compatibility_flags": ["enable_request_signal"],
   "workers_dev": true,
   "secrets": { "required": [] },
   "vars": {
