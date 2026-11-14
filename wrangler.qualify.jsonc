@@ -9,7 +9,7 @@
     "QUALIFY_ISSUER": "https://dev-i8usug5fp48kepvr.us.auth0.com/",
     "QUALIFY_MCP_AUDIENCE": "https://simpli-invoice-mcp-dev.simplitica.co/mcp",
     "QUALIFY_APPLE_IDENTITY_CLAIM": "https://simplitica.co/apple_identity",
-    "QUALIFY_CLIENT_ID": "REPLACE_WITH_DEVELOPMENT_CLIENT_ID",
+    "QUALIFY_CLIENT_ID": "tpc_5RjUULWf1V9koMnfWj1Xg3",
     "QUALIFY_PROBE_SCOPE": "probe:read"
   },
   "dev": { "ip": "127.0.0.1", "port": 8787 }

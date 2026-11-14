@@ -12,7 +12,7 @@ Owner-driven development setup on November 14, 2026:
 | --- | --- |
 | Issuer | `https://dev-i8usug5fp48kepvr.us.auth0.com/` |
 | Native client | Separate first-party native app; created, no SDK validation yet |
-| ChatGPT client | Dedicated Regular Web third-party application with `tpc_` client ID; copy exact value from Auth0 |
+| ChatGPT client | Dedicated Regular Web third-party client `tpc_5RjUULWf1V9koMnfWj1Xg3` (from owner screenshot; confirm against dashboard before live use) |
 | Client authentication | Client Secret (Post); secret stays in Auth0/ChatGPT secure configuration |
 | Canonical resource/API identifier | `https://simpli-invoice-mcp-dev.simplitica.co/mcp` (planned hostname, not yet provisioned) |
 | API permission | `probe:read`; explicit user-delegated client grant only |
@@ -43,7 +43,7 @@ Configure these nonsecret bindings in the dedicated probe config/local developme
 - `QUALIFY_ENVIRONMENT`: `development`.
 - `QUALIFY_ISSUER`: exact HTTPS issuer including trailing slash.
 - `QUALIFY_MCP_AUDIENCE`: exact canonical HTTPS resource, including `/mcp` and without a trailing slash.
-- `QUALIFY_CLIENT_ID`: exact allowlisted `tpc_` client ID copied from Auth0; replace any placeholder before use.
+- `QUALIFY_CLIENT_ID`: exact allowlisted `tpc_` client ID; development value is configured from the owner’s screenshot, so confirm it against the dashboard before live use.
 - `QUALIFY_PROBE_SCOPE`: `probe:read`.
 - `QUALIFY_APPLE_IDENTITY_CLAIM`: `https://simplitica.co/apple_identity`.
 
@@ -69,11 +69,11 @@ The Worker requires the configured namespaced string claim in the verified API t
 
 Configure a Post Login Action **in the development tenant only**, scoped to the exact third-party client and probe audience. Auth0's trusted `event.connection` and `event.user.identities` supply the Apple connection and opaque provider identity. Do not derive it by stripping `apple|` from the Auth0 subject, and do not copy a value from user-editable metadata.
 
-Example Action template (replace the client placeholder before applying; this repository does not apply it automatically):
+Example Action template (confirm the development client ID before applying; this repository does not apply it automatically):
 
 ```js
 exports.onExecutePostLogin = async (event, api) => {
-  const clientId = 'REPLACE_WITH_EXACT_DEVELOPMENT_TPC_CLIENT_ID';
+  const clientId = 'tpc_5RjUULWf1V9koMnfWj1Xg3';
   const resource = 'https://simpli-invoice-mcp-dev.simplitica.co/mcp';
   if (event.client.client_id !== clientId) return;
   if (event.resource_server?.identifier !== resource) {
