@@ -38,8 +38,8 @@
 - [x] Implement a standalone SDK Worker with no storage binding and bounded body/JWKS handling.
 - [x] Verify the production app remains separate; run full Node/workerd suites, lint, builds, probe dry-run and diff checks.
 - [x] Document exact local setup, identity claim requirement, nonsecret provider configuration, separate development deploy/tunnel procedure and remaining live gates.
-- [ ] Commit scoped work; obtain independent spec/quality review, fix blockers and obtain scoped re-review.
-- [ ] Push the feature branch; verify its remote commit matches local HEAD.
+- [x] Commit scoped work; obtain independent spec/quality review, fix blockers and obtain scoped re-review. Final code review passed at `93226f6`.
+- [x] Push the feature branch; verify its remote commit matches local HEAD. Feature branch published after review; production remains unchanged.
 
 ### Task 2: Development HTTPS and ChatGPT linking (not completed by a push)
 

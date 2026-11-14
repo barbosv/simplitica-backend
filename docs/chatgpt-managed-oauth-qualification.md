@@ -137,3 +137,9 @@ An otherwise-valid unexpired JWT can remain accepted by this stateless verifier 
 - [Auth0 refresh rotation](https://auth0.com/docs/secure/tokens/refresh-tokens/configure-refresh-token-rotation)
 
 - [Cloudflare incoming request-signal compatibility flag](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-requestsignal-for-incoming-requests)
+
+## Local implementation evidence — November 14, 2026
+
+Final runtime code was independently accepted for specification and quality at `93226f6` after fixing four findings: local secret inheritance, upload/disconnect lifecycle, meaningful algorithm rejection fixtures, and canonical URL validation. The last disconnect fix has a real direct-workerd TCP regression that fails with the required flag removed. The original implementation agent reached a usage limit during that small final test change; the coordinator completed verification and obtained independent re-review.
+
+Fresh local results: 72 Node tests in 14 files, 109 workerd tests in 11 files (68 probe cases), lint, Node build, Worker typecheck and isolated probe dry run passed. The existing production Worker dry run also passed during the implementation/fix wave. Existing dependency source-map and compatibility warnings were recorded; no production deployment was performed. These results establish local code behavior, not any pending live gate above.
