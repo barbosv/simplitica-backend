@@ -43,8 +43,8 @@
 
 ### Task 2: Development HTTPS and ChatGPT linking (not completed by a push)
 
-- [ ] Establish a dedicated staging Worker or supported tunnel, with no production bindings. Verify the canonical domain and OAuth metadata routing.
-- [ ] Configure the development-tenant Action for the signed opaque Apple identity claim; verify exact third-party client ID copied from Auth0, not screenshot transcription.
+- [x] Establish a dedicated staging Worker or supported tunnel, with no production bindings. Verify the canonical domain and OAuth metadata routing.
+- [x] Configure the development-tenant Action for the signed opaque Apple identity claim; verify exact third-party client ID copied from Auth0, not screenshot transcription.
 - [ ] Obtain exact callback from the actual ChatGPT portal and register it with the predefined client; keep API-only OIDC settings and explicit scopes.
 - [ ] Link using real Apple login and S256. Record sanitized actual resource/audience/token request evidence and a successful synthetic tool call from ChatGPT.
 

@@ -22,6 +22,9 @@ it("starts the documented probe command without binding unrelated local secrets"
   const configuration = parse(await readFile(join(root, "wrangler.qualify.jsonc"), "utf8"));
   // Only synthetic configuration and a harmless sentinel enter this isolated directory.
   configuration.main = join(directory, "inspect.mjs");
+  // Keep routing behavior under test, using only a synthetic hostname/account context.
+  configuration.routes = [{ pattern: "probe.test", custom_domain: true }];
+  delete configuration.account_id;
   configuration.vars = {
     QUALIFY_ENVIRONMENT: "development", QUALIFY_ISSUER: "https://issuer.test/",
     QUALIFY_MCP_AUDIENCE: "https://probe.test/mcp", QUALIFY_APPLE_IDENTITY_CLAIM: "https://probe.test/apple",

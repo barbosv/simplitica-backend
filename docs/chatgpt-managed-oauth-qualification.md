@@ -12,16 +12,16 @@ Owner-driven development setup on November 14, 2026:
 | --- | --- |
 | Issuer | `https://dev-i8usug5fp48kepvr.us.auth0.com/` |
 | Native client | Separate first-party native app; created, no SDK validation yet |
-| ChatGPT client | Dedicated Regular Web third-party client `tpc_5RjUULWf1V9koMnfWj1Xg3` (from owner screenshot; confirm against dashboard before live use) |
+| ChatGPT client | Dedicated Regular Web third-party client `tpc_5RjUULWf1V9koMnfWj1Xg3` (confirmed against the signed-in development dashboard) |
 | Client authentication | Client Secret (Post); secret stays in Auth0/ChatGPT secure configuration |
-| Canonical resource/API identifier | `https://simpli-invoice-mcp-dev.simplitica.co/mcp` (planned hostname, not yet provisioned) |
+| Canonical resource/API identifier | `https://simpli-invoice-mcp-dev.simplitica.co/mcp` (deployed isolated development custom domain) |
 | API permission | `probe:read`; explicit user-delegated client grant only |
 | Authoring/payment access | None |
 | Apple | Connection test succeeded in hosted flow; domain-level promotion reported |
 | Resource compatibility | Tenant profile enabled, owner confirmed |
 | Refresh | Grant enabled, rotation enabled, overlap 0 shown in screenshot; live behavior untested |
-| Apple identity claim | Requires development Action configuration below; not yet confirmed in signed API tokens |
-| Actual ChatGPT callback | Pending; use the exact portal value, no guessed/wildcard URL |
+| Apple identity claim | Scoped development Action deployed and applied; not yet confirmed in signed API tokens |
+| Actual ChatGPT callback | `https://chatgpt.com/connector_platform_oauth_redirect`; copied from the current portal and saved to the development client |
 
 An earlier standard first-party ChatGPT development client was superseded during setup. Do not use it for strict third-party qualification. Do not modify the native client into a third-party client. Neither deletion nor broader system-API access is required.
 
@@ -36,14 +36,14 @@ npm run dev:qualify
 npm run build:qualify
 ```
 
-`dev:qualify` binds loopback. Its dedicated Wrangler config uses an explicit empty required-secret list to prevent unrelated root `.dev.vars` entries from becoming probe bindings; only its configured nonsecret variables are admitted. Do not remove that filter or copy the main application’s secrets into this probe. A real Wrangler regression verifies isolation with a harmless sentinel, without reading real credentials. The build is a dry run and must not upload a Worker. Keep authentication secrets out of the Worker: it validates access tokens with the issuer's public signing keys and needs no client secret.
+`dev:qualify` binds loopback and disables route-derived origin inference so the deployed custom domain does not break local Host validation. Its dedicated Wrangler config uses an explicit empty required-secret list to prevent unrelated root `.dev.vars` entries from becoming probe bindings; only its configured nonsecret variables are admitted. Do not remove that filter or copy the main application’s secrets into this probe. A real Wrangler regression verifies isolation with a harmless sentinel, without reading real credentials. The build is a dry run and must not upload a Worker. Keep authentication secrets out of the Worker: it validates access tokens with the issuer's public signing keys and needs no client secret.
 
 Configure these nonsecret bindings in the dedicated probe config/local development settings:
 
 - `QUALIFY_ENVIRONMENT`: `development`.
 - `QUALIFY_ISSUER`: exact HTTPS issuer including trailing slash.
 - `QUALIFY_MCP_AUDIENCE`: exact canonical HTTPS resource, including `/mcp` and without a trailing slash.
-- `QUALIFY_CLIENT_ID`: exact allowlisted `tpc_` client ID; development value is configured from the owner’s screenshot, so confirm it against the dashboard before live use.
+- `QUALIFY_CLIENT_ID`: exact allowlisted `tpc_` client ID; development value was confirmed against the signed-in Auth0 dashboard.
 - `QUALIFY_PROBE_SCOPE`: `probe:read`.
 - `QUALIFY_APPLE_IDENTITY_CLAIM`: `https://simplitica.co/apple_identity`.
 
@@ -69,7 +69,7 @@ The Worker requires the configured namespaced string claim in the verified API t
 
 Configure a Post Login Action **in the development tenant only**, scoped to the exact third-party client and probe audience. Auth0's trusted `event.connection` and `event.user.identities` supply the Apple connection and opaque provider identity. Do not derive it by stripping `apple|` from the Auth0 subject, and do not copy a value from user-editable metadata.
 
-Example Action template (confirm the development client ID before applying; this repository does not apply it automatically):
+The following Action was deployed as **Simpli Invoice Dev Apple Identity** and applied to the development Post Login flow on November 14, 2026. The dashboard confirmed all flow changes live. Built-in tests with synthetic events verified claim issuance for Apple, rejection of non-Apple login and wrong audience, and no-op behavior for another client. These are not real signed-token tests. The repository does not apply the Action automatically:
 
 ```js
 exports.onExecutePostLogin = async (event, api) => {
@@ -95,11 +95,13 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 ```
 
-This is an issuer assertion, not independent proof that native and hosted flows identify the same Apple user. Validate the identity data shape in a real development login and refresh transaction; if the event lacks the required fields, deny and investigate rather than fall back to email or a guessed prefix. Review the template before publishing it to the development Login flow. For full continuity qualification, separately issue native-audience tokens with the equivalent trusted mapping and compare identifiers privately under the same approved Apple App ID/developer-team grouping. Do not expose those identities in MCP output.
+This is an issuer assertion, not independent proof that native and hosted flows identify the same Apple user. Validate the identity data shape in a real development login and refresh transaction; if the event lacks the required fields, deny and investigate rather than fall back to email or a guessed prefix. Review any future template change before publishing it to the development Login flow. For full continuity qualification, separately issue native-audience tokens with the equivalent trusted mapping and compare identifiers privately under the same approved Apple App ID/developer-team grouping. Do not expose those identities in MCP output.
 
 ## HTTPS staging or tunnel
 
-No deployment, DNS mutation or tunnel was performed by creating/pushing this code. For the later live milestone:
+On November 14, 2026, the isolated `simplitica-mcp-probe-development` Worker was deployed to the canonical development custom domain, version `6625cb89-d270-4f05-860a-74066c734051`. Cloudflare provisioned its DNS and TLS. No production deployment or migration was performed. External HTTPS checks passed: health 200, protected-resource metadata 200, anonymous and invalid-bearer MCP POST 401, and MCP GET 405 with `Allow: POST`. No real authenticated ChatGPT call has passed yet.
+
+For future deployment or tunnel changes:
 
 1. Inspect `wrangler.qualify.jsonc`: entry point must be the probe and bindings must contain no production storage/service resources. Select the intended development Cloudflare account explicitly.
 2. Use a dedicated development Worker, never `simplitica-backend`, or a supported tunnel to the loopback probe. The custom canonical hostname above needs separate DNS/routing setup. A workers.dev URL alone does not provision it.
@@ -115,7 +117,7 @@ Request only the explicit API permission plus `offline_access` when supported. I
 
 | Gate | Required real evidence | Current status |
 | --- | --- | --- |
-| Discovery | Canonical resource metadata and unmodified provider discovery | Development issuer metadata reachable; probe endpoint pending |
+| Discovery | Canonical resource metadata and unmodified provider discovery | Development issuer and canonical probe metadata reachable over HTTPS; anonymous/invalid-token challenges verified |
 | Scope/resource | S256 authorization and token exchange; signed API JWT with exact audience/client/scope/Apple claim | Pending |
 | First milestone | ChatGPT initializes, lists and invokes `qualification_probe` through authenticated development connection | Pending |
 | Native/hosted identity | Same verified opaque Apple identity in separately validated native and hosted flows | Pending; native SDK not integrated |
