@@ -1,10 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "simplitica-mcp-probe-development",
+  "account_id": "ce1ed6e62f9f888ccd0582591e17e520",
   "main": "src/worker/qualification/index.ts",
   "compatibility_date": "2026-11-09",
   "compatibility_flags": ["enable_request_signal"],
-  "workers_dev": true,
+  "workers_dev": false,
+  "routes": [{ "pattern": "simpli-invoice-mcp-dev.simplitica.co", "custom_domain": true }],
   "secrets": { "required": [] },
   "vars": {
     "QUALIFY_ENVIRONMENT": "development",
