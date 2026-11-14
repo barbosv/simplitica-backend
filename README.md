@@ -1,5 +1,7 @@
 # simplitica-backend
 
+Cloudflare Workers + D1 implementation: see [cutover and local development](docs/cloudflare-cutover.md). The Worker uses the same API handlers with D1 repositories; the Node/PostgreSQL server below remains available for comparison and rollback preparation. Cloud Run auto-deployment is disabled in favor of explicit manual deployment.
+
 Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Apple subscription sync**, **Stripe Connect** invoice payments, and **SimpliList Publix BOGO deals proxy**.
 
 ## Features

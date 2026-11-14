@@ -1,19 +1,32 @@
-import type { FastifyInstance } from "fastify";
+import type { ApiRouter } from "../http.js";
+import { cachedResponse, type ResponseCache } from "../cache.js";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import { BLSWageService } from "../pricing/bls-wage-service.js";
-import { createRetailPriceProvider, isLiveMaterialsPricingConfigured } from "../pricing/retail-price-provider.js";
+import {
+  createRetailPriceProvider,
+  isLiveMaterialsPricingConfigured,
+} from "../pricing/retail-price-provider.js";
 import { MaterialsPricingService } from "../pricing/materials-service.js";
+import type {
+  PricingCacheStore,
+  CachedMaterialQuote,
+} from "../pricing/pricing-cache.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
 
 const optionalUSStateCode = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
   z.string().length(2).optional(),
 );
 
 const optionalZipCode = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-  z.string().regex(/^\d{5}$/).optional(),
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z
+    .string()
+    .regex(/^\d{5}$/)
+    .optional(),
 );
 
 const MaterialsRequestSchema = z.object({
@@ -29,10 +42,19 @@ const WageRequestSchema = z.object({
   fallback: z.coerce.number().nonnegative().default(0),
 });
 
-export function registerPricingRoutes(app: FastifyInstance, env: Env) {
+export function registerPricingRoutes(
+  app: ApiRouter,
+  env: Env,
+  cache?: ResponseCache,
+  materialCache?: PricingCacheStore<CachedMaterialQuote>,
+) {
   const provider = createRetailPriceProvider(env);
   const liveLookupAvailable = isLiveMaterialsPricingConfigured(env);
-  const service = new MaterialsPricingService(provider, liveLookupAvailable);
+  const service = new MaterialsPricingService(
+    provider,
+    liveLookupAvailable,
+    materialCache,
+  );
   const wageService = new BLSWageService({ apiKey: env.BLS_API_KEY });
 
   app.post("/v1/pricing/wages", async (req, reply) => {
@@ -42,11 +64,17 @@ export function registerPricingRoutes(app: FastifyInstance, env: Env) {
     }
 
     try {
-      return await wageService.lookup({
-        soc_code: body.soc_code,
-        state_code: body.state_code,
-        fallback: body.fallback,
-      });
+      return await cachedResponse(
+        cache,
+        "wages:" + JSON.stringify(body),
+        () =>
+          wageService.lookup({
+            soc_code: body.soc_code,
+            state_code: body.state_code,
+            fallback: body.fallback,
+          }),
+        (result) => (result.source === "bls_live" ? 86400000 : 300000),
+      );
     } catch (err) {
       req.log.error({ err }, "wage pricing failed");
       return reply.code(503).send({ error: "Wage pricing unavailable" });

@@ -3,3 +3,9 @@ dist/
 data/
 .env
 .DS_Store
+
+dist-worker/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+src/worker/vendor/

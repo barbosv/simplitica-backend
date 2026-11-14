@@ -4,6 +4,11 @@ export type CachedMaterialQuote = {
   attemptedLiveLookup: boolean;
 };
 
+export interface PricingCacheStore<T> {
+  get(key: string): T | null | undefined | Promise<T | null | undefined>;
+  set(key: string, value: T, ttlMs: number): void | Promise<void>;
+}
+
 export class PricingCache<T> {
   private readonly ttlMs: number;
   private readonly entries = new Map<string, { value: T; expiresAt: number }>();

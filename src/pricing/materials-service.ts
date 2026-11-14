@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import catalog from "./material_catalog.json" with { type: "json" };
 import type { RetailPriceProvider } from "./home-depot-client.js";
-import { PricingCache, type CachedMaterialQuote } from "./pricing-cache.js";
+import {
+  PricingCache,
+  type CachedMaterialQuote,
+  type PricingCacheStore,
+} from "./pricing-cache.js";
 
 export type MaterialCatalogEntry = {
   search_query: string;
@@ -31,26 +33,26 @@ export type MaterialsPricingResponse = {
 const LIVE_PRICE_CACHE_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_CACHE_MS = 5 * 60 * 1000;
 
-const materialCatalog = JSON.parse(
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "material_catalog.json"), "utf8"),
-) as Record<string, MaterialCatalogEntry>;
+const materialCatalog = catalog as Record<string, MaterialCatalogEntry>;
 
 export class MaterialsPricingService {
   private readonly provider: RetailPriceProvider;
   private readonly liveLookupAvailable: boolean;
-  private readonly cache: PricingCache<CachedMaterialQuote>;
+  private readonly cache: PricingCacheStore<CachedMaterialQuote>;
 
   constructor(
     provider: RetailPriceProvider,
     liveLookupAvailable: boolean,
-    cache = new PricingCache<CachedMaterialQuote>(),
+    cache: PricingCacheStore<CachedMaterialQuote> = new PricingCache<CachedMaterialQuote>(),
   ) {
     this.provider = provider;
     this.liveLookupAvailable = liveLookupAvailable;
     this.cache = cache;
   }
 
-  async quote(request: MaterialsPricingRequest): Promise<MaterialsPricingResponse> {
+  async quote(
+    request: MaterialsPricingRequest,
+  ): Promise<MaterialsPricingResponse> {
     const quantity = Math.max(request.quantity, 1);
     const zip = request.zip_code?.trim() || undefined;
     const lineItems: Record<string, number> = {};
@@ -87,7 +89,7 @@ export class MaterialsPricingService {
     if (!entry) return { price: 0, live: false, attemptedLiveLookup: false };
 
     const cacheKey = `${zipCode ?? "US"}:${materialKey}`;
-    const cached = this.cache.get(cacheKey);
+    const cached = await this.cache.get(cacheKey);
     if (cached) {
       return cached;
     }
@@ -108,8 +110,12 @@ export class MaterialsPricingService {
     }
 
     if (quote) {
-      const result = { price: quote.price, live: true, attemptedLiveLookup: true };
-      this.cache.set(cacheKey, result, LIVE_PRICE_CACHE_MS);
+      const result = {
+        price: quote.price,
+        live: true,
+        attemptedLiveLookup: true,
+      };
+      await this.cache.set(cacheKey, result, LIVE_PRICE_CACHE_MS);
       return result;
     }
 
@@ -119,7 +125,7 @@ export class MaterialsPricingService {
       attemptedLiveLookup,
     };
     // Short TTL so intermittent OpenWeb successes are retried soon after upstream 502s.
-    this.cache.set(cacheKey, fallback, FALLBACK_CACHE_MS);
+    await this.cache.set(cacheKey, fallback, FALLBACK_CACHE_MS);
     return fallback;
   }
 }

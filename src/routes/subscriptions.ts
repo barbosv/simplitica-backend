@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { ApiRouter } from "../http.js";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import type { AppContext } from "../db/context.js";
@@ -8,15 +8,23 @@ import { buildSignedDataVerifier } from "../apple/verifier.js";
 import { entitlementStateFromDecodedTransaction } from "../subscription-state.js";
 import { parseRequestBody } from "../middleware/parse-body.js";
 
-export async function registerSubscriptionRoutes(app: FastifyInstance, env: Env, ctx: AppContext) {
+export async function registerSubscriptionRoutes(
+  app: ApiRouter,
+  env: Env,
+  ctx: AppContext,
+) {
   const apps = buildAppsRegistry(env);
 
   app.get("/v1/entitlements", async (req, reply) => {
     const bundleId = req.headers["x-bundle-id"] as string | undefined;
     const appSlugHeader = req.headers["x-app-slug"] as string | undefined;
-    const appSlug = (bundleId && apps.byBundleId[bundleId]?.slug) ?? appSlugHeader ?? "simpli-invoice";
+    const appSlug =
+      (bundleId && apps.byBundleId[bundleId]?.slug) ??
+      appSlugHeader ??
+      "simpli-invoice";
     const token = req.headers["x-app-account-token"] as string | undefined;
-    if (!token) return reply.code(400).send({ error: "Missing X-App-Account-Token" });
+    if (!token)
+      return reply.code(400).send({ error: "Missing X-App-Account-Token" });
     const ent = await ctx.repos.subscriptions.getEntitlement(appSlug, token);
     return { entitlement: ent };
   });
@@ -46,18 +54,27 @@ export async function registerSubscriptionRoutes(app: FastifyInstance, env: Env,
 
     let decoded;
     try {
-      decoded = await verifier.verifyAndDecodeTransaction(body.signedTransactionInfo);
+      decoded = await verifier.verifyAndDecodeTransaction(
+        body.signedTransactionInfo,
+      );
     } catch {
       return reply.code(400).send({ error: "Invalid signedTransactionInfo" });
     }
     const productId = decoded.productId;
     const originalTransactionId = decoded.originalTransactionId;
     if (!productId || !originalTransactionId) {
-      return reply.code(400).send({ error: "Missing productId/originalTransactionId in transaction" });
+      return reply
+        .code(400)
+        .send({
+          error: "Missing productId/originalTransactionId in transaction",
+        });
     }
 
     const expiresAtMs = decoded.expiresDate;
-    const expiresAt = typeof expiresAtMs === "number" ? new Date(expiresAtMs).toISOString() : undefined;
+    const expiresAt =
+      typeof expiresAtMs === "number"
+        ? new Date(expiresAtMs).toISOString()
+        : undefined;
     const state = entitlementStateFromDecodedTransaction(decoded);
 
     const saved = await ctx.repos.subscriptions.upsert({
@@ -98,7 +115,9 @@ export async function registerSubscriptionRoutes(app: FastifyInstance, env: Env,
     }
 
     if (body.appSlug && body.appSlug !== appCfg.slug) {
-      return reply.code(400).send({ error: "appSlug does not match notification" });
+      return reply
+        .code(400)
+        .send({ error: "appSlug does not match notification" });
     }
 
     const verifier = buildSignedDataVerifier({
@@ -126,7 +145,10 @@ export async function registerSubscriptionRoutes(app: FastifyInstance, env: Env,
     }
 
     const expiresAtMs = decodedTx.expiresDate;
-    const expiresAt = typeof expiresAtMs === "number" ? new Date(expiresAtMs).toISOString() : undefined;
+    const expiresAt =
+      typeof expiresAtMs === "number"
+        ? new Date(expiresAtMs).toISOString()
+        : undefined;
     const state = entitlementStateFromDecodedTransaction(decodedTx);
 
     await ctx.repos.subscriptions.upsert({
