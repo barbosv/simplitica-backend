@@ -45,8 +45,9 @@
 
 - [x] Establish a dedicated staging Worker or supported tunnel, with no production bindings. Verify the canonical domain and OAuth metadata routing.
 - [x] Configure the development-tenant Action for the signed opaque Apple identity claim; verify exact third-party client ID copied from Auth0, not screenshot transcription.
-- [ ] Obtain exact callback from the actual ChatGPT portal and register it with the predefined client; keep API-only OIDC settings and explicit scopes.
-- [ ] Link using real Apple login and S256. Record sanitized actual resource/audience/token request evidence and a successful synthetic tool call from ChatGPT.
+- [x] Obtain exact callback from the actual ChatGPT portal and register it with the predefined client; keep API-only OIDC settings and explicit scopes.
+- [x] Link using real Apple login and record a successful synthetic tool call from ChatGPT (November 14, 2026; evidence in qualification runbook).
+- [ ] Independently capture actual S256/resource/scope authorization and token-exchange evidence; the successful call does not replace this audit.
 
 ### Task 3: Complete full P1T1b qualification before dependent implementation
 

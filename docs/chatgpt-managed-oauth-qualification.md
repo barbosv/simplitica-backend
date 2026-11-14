@@ -99,7 +99,7 @@ This is an issuer assertion, not independent proof that native and hosted flows 
 
 ## HTTPS staging or tunnel
 
-On November 14, 2026, the isolated `simplitica-mcp-probe-development` Worker was deployed to the canonical development custom domain, version `6625cb89-d270-4f05-860a-74066c734051`. Cloudflare provisioned its DNS and TLS. No production deployment or migration was performed. External HTTPS checks passed: health 200, protected-resource metadata 200, anonymous and invalid-bearer MCP POST 401, and MCP GET 405 with `Allow: POST`. No real authenticated ChatGPT call has passed yet.
+On November 14, 2026, the isolated `simplitica-mcp-probe-development` Worker was deployed to the canonical development custom domain, version `6625cb89-d270-4f05-860a-74066c734051`. Cloudflare provisioned its DNS and TLS. No production deployment or migration was performed. External HTTPS checks passed: health 200, protected-resource metadata 200, anonymous and invalid-bearer MCP POST 401, and MCP GET 405 with `Allow: POST`. An authenticated ChatGPT call passed after owner-completed Apple login, as recorded below.
 
 For future deployment or tunnel changes:
 
@@ -119,7 +119,7 @@ Request only the explicit API permission plus `offline_access` when supported. I
 | --- | --- | --- |
 | Discovery | Canonical resource metadata and unmodified provider discovery | Development issuer and canonical probe metadata reachable over HTTPS; anonymous/invalid-token challenges verified |
 | Scope/resource | S256 authorization and token exchange; signed API JWT with exact audience/client/scope/Apple claim | Pending |
-| First milestone | ChatGPT initializes, lists and invokes `qualification_probe` through authenticated development connection | Pending |
+| First milestone | ChatGPT initializes, lists and invokes `qualification_probe` through authenticated development connection | Passed November 14, 2026: installed development plugin, execution trace “Checked Synthetic Development Access”, result `{"success":true,"probe":"synthetic-development"}` |
 | Native/hosted identity | Same verified opaque Apple identity in separately validated native and hosted flows | Pending; native SDK not integrated |
 | Refresh | New refresh token after exchange; old-token reuse rejected outside overlap, with token-family behavior recorded | Pending |
 | Disconnect/revocation | Revoked grant/refresh token cannot renew; local/probe access denial behavior documented | Pending |
@@ -145,3 +145,14 @@ An otherwise-valid unexpired JWT can remain accepted by this stateless verifier 
 Final runtime code was independently accepted for specification and quality at `93226f6` after fixing four findings: local secret inheritance, upload/disconnect lifecycle, meaningful algorithm rejection fixtures, and canonical URL validation. The last disconnect fix has a real direct-workerd TCP regression that fails with the required flag removed. The original implementation agent reached a usage limit during that small final test change; the coordinator completed verification and obtained independent re-review.
 
 Fresh local results: 72 Node tests in 14 files, 109 workerd tests in 11 files (68 probe cases), lint, Node build, Worker typecheck and isolated probe dry run passed. The existing production Worker dry run also passed during the implementation/fix wave. Existing dependency source-map and compatibility warnings were recorded; no production deployment was performed. These results establish local code behavior, not any pending live gate above.
+
+## Live ChatGPT probe evidence — November 14, 2026
+
+The owner entered the third-party development client secret directly in ChatGPT and completed Apple sign-in. ChatGPT returned to the Plugins page with the development plugin installed and a connection-success notice. Its Try in chat flow invoked the synthetic probe; the expanded execution trace showed **Checked Synthetic Development Access**, followed by the expected `success: true`, `probe: synthetic-development` result.
+
+- Plugin: `plugin_asdk_app_6af882aa05848191914e4c94171532ec`.
+- Evidence conversation: [Qualification Probe Result](https://chatgpt.com/c/6af885e3-2494-83e9-b016-203e56e9d167).
+- Portal configuration: predefined third-party client, `client_secret_post`, default `probe:read`, base `offline_access`, OIDC disabled; discovered endpoints and resource left unchanged.
+- No tokens, secrets or opaque personal Apple identifiers were collected. No customer or invoice bindings exist in this Worker.
+
+Because the deployed verifier requires RS256 issuer/audience/client/scope/Apple-claim validation for MCP POST, the successful call is evidence that this request passed those checks. This is an inference from deployed code behavior and visible execution, not a captured JWT audit. The initial ChatGPT authorization redirect was not captured, so actual S256/resource/scope request details remain unverified. Refresh rotation/reuse, revocation behavior and native/hosted identity continuity remain pending.
