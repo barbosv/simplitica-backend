@@ -72,6 +72,8 @@ Configure a Post Login Action **in the development tenant only**, scoped to the 
 The following Action was deployed as **Simpli Invoice Dev Apple Identity** and applied to the development Post Login flow on November 14, 2026. The dashboard confirmed all flow changes live. Built-in tests with synthetic events verified claim issuance for Apple, rejection of non-Apple login and wrong audience, and no-op behavior for another client. These are not real signed-token tests. The repository does not apply the Action automatically:
 
 ```js
+/* global exports, console */
+// Development tenant only. Never log request bodies, tokens, identities or query values.
 exports.onExecutePostLogin = async (event, api) => {
   const clientId = 'tpc_5RjUULWf1V9koMnfWj1Xg3';
   const resource = 'https://simpli-invoice-mcp-dev.simplitica.co/mcp';
@@ -88,6 +90,20 @@ exports.onExecutePostLogin = async (event, api) => {
   if (event.connection.strategy !== 'apple' || identities.length !== 1) {
     api.access.deny('A single verified Apple identity is required');
     return;
+  }
+  if (event.transaction?.protocol === 'oauth2-refresh-token') {
+    console.log(JSON.stringify({ event: 'development-oauth-qualification', flow: 'refresh' }));
+  } else {
+    const query = event.request?.query ?? {};
+    const scopes = typeof query.scope === 'string' ? query.scope.split(/\s+/).filter(Boolean) : [];
+    console.log(JSON.stringify({
+      event: 'development-oauth-qualification', flow: 'authorization',
+      pkceS256: query.code_challenge_method === 'S256'
+        && typeof query.code_challenge === 'string' && query.code_challenge.length > 0,
+      resourceMatches: query.resource === resource,
+      probeScope: scopes.includes('probe:read'), offlineAccess: scopes.includes('offline_access'),
+      unexpectedScopes: scopes.some(scope => scope !== 'probe:read' && scope !== 'offline_access'),
+    }));
   }
   api.accessToken.setCustomClaim(
     'https://simplitica.co/apple_identity', identities[0].user_id
@@ -156,3 +172,9 @@ The owner entered the third-party development client secret directly in ChatGPT 
 - No tokens, secrets or opaque personal Apple identifiers were collected. No customer or invoice bindings exist in this Worker.
 
 Because the deployed verifier requires RS256 issuer/audience/client/scope/Apple-claim validation for MCP POST, the successful call is evidence that this request passed those checks. This is an inference from deployed code behavior and visible execution, not a captured JWT audit. The initial ChatGPT authorization redirect was not captured, so actual S256/resource/scope request details remain unverified. Refresh rotation/reuse, revocation behavior and native/hosted identity continuity remain pending.
+
+## Additional provider evidence
+
+Auth0 development tenant logs independently confirm Apple login at `2026-11-14T16:01:14.602Z` and successful code exchange (`seacft`) at `2026-11-14T16:01:17.017Z` for the configured third-party client and canonical MCP audience. The login consent context records exactly `offline_access probe:read`; the exchange summary scope is null, so it is not used as scope evidence. Standard logs do not expose the original PKCE parameters.
+
+The versioned development Action source now lives at `scripts/auth0/development-apple-identity.cjs`; tests execute that exact artifact. Its additional audit emits fixed labels and booleans only after identity/audience guards: authorization S256 presence, exact resource match, API/offline scope presence and unexpected-scope status, or a refresh-flow marker. It never logs request bodies, raw query values, personal identity, client secrets or tokens. Logging records observations and does not turn provider configuration or synthetic events into live qualification evidence.
