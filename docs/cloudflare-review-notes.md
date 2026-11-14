@@ -49,7 +49,9 @@ Verified against staging:
 - Cloudflare analytics (`workersInvocationsAdaptive`) reported wall-time p50 ≈ 113 ms and p99 ≈ 271 ms over sampled staging traffic. The GraphQL schema available to this account did not expose `cpuTime`, so free-plan 10 ms CPU eligibility is still not proven. Deploy reported Worker startup ≈ 48–79 ms.
 - Python/`urllib` clients can receive Cloudflare error 1010 against `workers.dev`; use a normal browser User-Agent for smoke checks.
 
-### Blockers before production DNS cutover
+### Historical blockers before production DNS cutover (resolved in part on 2026-11-10)
+
+Production DNS cutover, live Stripe configuration, and reversible Google shutdown subsequently occurred. See `cloudflare-cutover.md` for the recorded rollout status and remaining verification gaps. The list below records the earlier staging review.
 
 1. **Staging hostname DNS:** Worker route `simpli-invoice-staging.simplitica.co/*` is configured on the zone-owning account, but Wrangler OAuth only has zone **read** (no DNS write). Create a proxied CNAME in the Cloudflare dashboard: `simpli-invoice-staging` → `simplitica-backend-staging.vitor-barbosa-ce1.workers.dev`.
 2. **Current production API hostname:** `simpli-invoice.simplitica.co` is a CNAME to `ghs.googlehosted.com` (Cloud Run domain mapping). Leave it alone until staging on this account passes Apple/Stripe sandbox checks and CPU/plan decisions.

@@ -1,5 +1,15 @@
 # Simplitica Cloudflare cutover
 
+## Recorded rollout status (2026-11-14)
+
+Production moved to Cloudflare on 2026-11-10. The proxied backend hostname serves the production Worker with D1 and Stripe live mode. Cloud Run was disabled with manual scaling at zero instances, its GitHub deployment workflow was disabled, and Cloud SQL was stopped with activation policy `NEVER`. These are reversible shutdowns, not resource deletion.
+
+The PostgreSQL export was merged into D1 with backups and row-level verification: three existing business links were preserved, four historical invoice payment records and 34 Stripe events were imported, and all 44 source rows (including migration metadata) were archived. PostgreSQL had zero subscription rows. The four current D1 business links, including the new live onboarding connection, were preserved. Backup files and raw records are outside version control.
+
+On 2026-11-14 the production readiness endpoint returned HTTP 200 with D1 connected. Cloudflare analytics for the deployed production Worker reported 1,120 invocations, including scheduled maintenance, and zero runtime errors from deployment through 2026-11-14 11:25 UTC. This does not establish uninterrupted uptime or end-to-end Apple/payment correctness.
+
+Current Google resource and billing verification requires reauthentication. Do not claim zero Google charges: retained Cloud SQL storage/IP, backups, Artifact Registry images and other resources can still be billable. Existing App Store subscriber access and server notification delivery remain separate verification items. The remaining sections describe the rollout procedure and rollback constraints.
+
 The implementation can be built and tested without cloud credentials. Creating remote resources, deploying, switching DNS, and retiring GCP require access to the owning accounts. Nothing in the local test/build commands changes production.
 
 ## Local development and checks
@@ -102,4 +112,4 @@ Only after hostname/app/payment verification succeeds:
 - Remove the unused backend service and SQL instance after recording required configuration and verifying nothing needs the old `run.app` endpoint. Remove unneeded billable backups/images separately; preserve unrelated website/services.
 - Recheck GCP resource inventory and billing after deletion. Routing to Cloudflare alone does not stop Google charges. Confirm Cloudflare remains on the intended plan and monitor usage there.
 
-Deployment, CPU/upstream staging verification, DNS cutover, and retirement remain pending until account access is available. No cost saving is claimed until the paid resources have actually been retired.
+Deployment and DNS cutover are complete as recorded above. CPU/upstream and real paid-subscriber verification remain incomplete; reversible Google shutdown does not establish zero remaining cost.

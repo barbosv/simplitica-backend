@@ -46,7 +46,7 @@
 			"vars": {
 				"NODE_ENV": "production",
 				"APPLE_ENVIRONMENT": "Production",
-				"STRIPE_MODE": "test",
+				"STRIPE_MODE": "live",
 				"STRIPE_CONNECT_RETURN_URL": "https://simpli-invoice.simplitica.co/stripe/return",
 				"STRIPE_CONNECT_REFRESH_URL": "https://simpli-invoice.simplitica.co/stripe/refresh",
 			},
