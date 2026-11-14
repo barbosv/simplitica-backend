@@ -65,3 +65,31 @@ it.each([
   expect(result.claims).toEqual([]);
   expect(result.logs).toEqual([]);
 });
+
+const nativeEvent = {
+  client: { client_id: "WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa" },
+  resource_server: { identifier: "https://simpli-invoice-native-dev.simplitica.co/api" },
+  request: { query: { audience: "https://simpli-invoice-native-dev.simplitica.co/api",
+    scope: "openid profile offline_access qualification:read", code_challenge_method: "S256", code_challenge: "PRIVATE-CHALLENGE" } },
+};
+
+it("maps the same trusted opaque identity for the separately scoped native development client", async () => {
+  const result = await execute(nativeEvent);
+  expect(result.denied).toEqual([]);
+  expect(result.claims).toEqual([["https://simplitica.co/apple_identity", "PRIVATE-APPLE-ID"]]);
+  expect(result.logs).toHaveLength(1);
+  expect(JSON.parse(result.logs[0]!)).toEqual({ event: "development-native-qualification", flow: "authorization",
+    pkceS256: true, audienceMatches: true, qualificationScope: true, offlineAccess: true, unexpectedScopes: false });
+  expect(result.logs.join()).not.toContain("PRIVATE");
+});
+
+it.each([
+  { ...nativeEvent, resource_server: { identifier: "https://simpli-invoice-mcp-dev.simplitica.co/mcp" } },
+  { resource_server: nativeEvent.resource_server },
+  { ...nativeEvent, connection: { strategy: "google-oauth2" } },
+])("rejects cross-client resource use or non-Apple native login: %j", async input => {
+  const result = await execute(input);
+  expect(result.denied).toHaveLength(1);
+  expect(result.claims).toEqual([]);
+  expect(result.logs).toEqual([]);
+});

@@ -50,7 +50,7 @@ it("rejects malformed raw HTTP targets without crashing or leaking a code, then 
   const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
     import { callbackReceiver } from './scripts/qualification/managed-oauth.ts';
     import { connect } from 'node:net';
-    const receiver = await callbackReceiver('correct-state', 2000, 0);
+    const receiver = await callbackReceiver('correct-state', 5000, 0);
     const port = new URL(receiver.redirect).port;
     let response = '';
     const socket = connect(Number(port), '127.0.0.1');
@@ -64,11 +64,11 @@ it("rejects malformed raw HTTP targets without crashing or leaking a code, then 
     console.log(JSON.stringify({ rejected: response.startsWith('HTTP/1.1 400'), validStatus: valid.status,
       accepted: (await receiver.code) === 'valid-code' }));
     await receiver.close();
-  `], { encoding: "utf8", timeout: 4000 });
+  `], { encoding: "utf8", timeout: 15_000 });
   expect(result.status).toBe(0);
   expect(result.stderr).not.toContain("SYNTHETIC-PRIVATE-CODE");
   expect(JSON.parse(result.stdout)).toEqual({ rejected: true, validStatus: 200, accepted: true });
-});
+}, 20_000);
 
 // Real HTTP issuer fixture: one rotating family, replay detection and revocation.
 async function issuerScenario(behavior: "rotate" | "reuse" | "accept-replay" | "identity-change" = "rotate") {

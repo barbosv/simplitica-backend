@@ -21,11 +21,11 @@
 
 Files: `scripts/qualification/managed-oauth.ts`, `test/managed-oauth-live-runner.test.ts`, runbook and package script.
 
-- [ ] Write RED tests for fixed S256 authorization/resource/scopes and strict callback state/path/duplicate/replay handling, using real loopback HTTP.
-- [ ] Implement loopback client callback and test it GREEN.
-- [ ] Write RED tests for refresh rotation, unchanged refresh rejection, replay/family denial, revoke denial and redacted failures using an actual disposable HTTP issuer fixture.
-- [ ] Implement in-memory token lifecycle checks; verify real JWTs through `jose` and fixed development config.
-- [ ] Run full Node suite, lint/build, independent review, commit and push feature branch.
+- [x] Write RED tests for fixed S256 authorization/resource/scopes and strict callback state/path/duplicate/replay handling, using real loopback HTTP.
+- [x] Implement loopback client callback and test it GREEN.
+- [x] Write RED tests for refresh rotation, unchanged refresh rejection, replay/family denial, revoke denial and redacted failures using an actual disposable HTTP issuer fixture.
+- [x] Implement in-memory token lifecycle checks; verify real JWTs through `jose` and fixed development config.
+- [x] Run full Node suite, lint/build, independent review, commit and push feature branch.
 - [ ] Register exact temporary development loopback callback; owner enters secret directly into a protected ignored local file. Run two owner-authenticated stages (reuse detection invalidates the first token family; revocation needs a fresh login).
 - [ ] Record sanitized live provider verdicts; remove temporary callback/config after testing without changing ChatGPT's existing callback.
 
