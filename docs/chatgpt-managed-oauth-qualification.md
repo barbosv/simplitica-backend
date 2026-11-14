@@ -36,7 +36,7 @@ npm run dev:qualify
 npm run build:qualify
 ```
 
-`dev:qualify` binds loopback. The build is a dry run and must not upload a Worker. Keep authentication secrets out of the Worker: it validates access tokens with the issuer's public signing keys and needs no client secret.
+`dev:qualify` binds loopback. Its dedicated Wrangler config uses an explicit empty required-secret list to prevent unrelated root `.dev.vars` entries from becoming probe bindings; only its configured nonsecret variables are admitted. Do not remove that filter or copy the main application’s secrets into this probe. A real Wrangler regression verifies isolation with a harmless sentinel, without reading real credentials. The build is a dry run and must not upload a Worker. Keep authentication secrets out of the Worker: it validates access tokens with the issuer's public signing keys and needs no client secret.
 
 Configure these nonsecret bindings in the dedicated probe config/local development settings:
 
@@ -61,7 +61,7 @@ curl -i -X POST http://127.0.0.1:8787/mcp \
 
 The first should advertise the exact canonical resource and development issuer; the unauthenticated MCP request should return 401 with a Bearer `resource_metadata` challenge. Never use a production access token for local experiments. Do not paste bearer/refresh tokens into chat, commit them, or attach raw browser network exports containing them.
 
-The probe uses a per-request JWKS resolver with a network timeout. It does not keep an indefinite startup-only JWKS snapshot. This favors straightforward key-rotation handling over minimizing development-tenant JWKS requests. The token algorithm is restricted to RS256. Unsupported MCP HTTP methods (including SSE GET) return 405 promptly. SDK-managed per-request responses must be consumed to completion; no standalone long-lived SSE subscription is provided.
+The probe uses a per-request JWKS resolver with a network timeout. It does not keep an indefinite startup-only JWKS snapshot. This favors straightforward key-rotation handling over minimizing development-tenant JWKS requests. The token algorithm is restricted to RS256. Unsupported MCP HTTP methods (including SSE GET) return 405 promptly. Authenticated uploads are limited to 64 KiB and a two-second body-acquisition deadline. Timed-out uploads return 408; disconnected uploads return 499. Cancellation cannot hold the response open, and the original abort signal is preserved into SDK handling. SDK-managed per-request responses must be consumed to completion; no standalone long-lived SSE subscription is provided.
 
 ## Signed Apple identity claim
 
