@@ -22,7 +22,7 @@ For exact payload bytes `P` and authenticator bytes `A`, reconstruct `clientData
 
 Require correct RP ID, exact client action/challenge context, permitted authenticator extensions and an increasing unsigned counter. The upstream path reads signed int32, so fail closed and require key rotation before its supported counter range is exhausted; never wrap/reset counters. Accept stored public keys only from prior verified attestations, not request-supplied keys. Cryptographic verification returns facts; challenge consumption, expected lifecycle revision, counter advancement and domain mutation must later commit in the same D1 batch. A separate earlier counter write followed by an unguarded lifecycle write is insufficient.
 
-Public native actions use prescribed canonical UTF8 bytes shared with Swift golden fixtures. The payload binds action/version, fresh server challenge, exact owner/session context, attested key, application/store environment, lifecycle expectedRevision when applicable, and exact purchase-proof hashes for enrollment. A failed compare-and-swap cannot silently rebase to a new revision and reuse the original signed intent.
+Public native actions use prescribed canonical UTF8 bytes shared with Swift golden fixtures. The payload binds action/version, externally configured authorization namespace, fresh server challenge, exact owner/session context, attested key, application/store environment, lifecycle expectedRevision when applicable, and exact purchase-proof hashes for enrollment. A failed compare-and-swap cannot silently rebase to a new revision and reuse the original signed intent.
 
 ## Verification and release gates
 
