@@ -13,7 +13,7 @@ const env = workerEnv as {
 };
 const now = 1_800_000_000_123;
 const identity = { issuer: "https://issuer.example/", appleIdentity: "apple|owner" };
-const command = () => ({ identity: { ...identity }, deviceKeyId: "device", clientId: "chatgpt", now });
+const command = () => ({ identity: { ...identity }, deviceKeyId: "device", clientId: "chatgpt", now, expectedRevision: 0 });
 const claims = () => ({ identity: { ...identity }, clientId: "chatgpt", tokenIssuedAt: 1_800_000_001, now: now + 1000 });
 const repo = () => createCloudConnectionRepository(env.DB);
 const tables = ["cloud_connections", "cloud_enrollment_commits", "cloud_purchase_lineages", "cloud_devices", "cloud_businesses", "cloud_identities", "cloud_owners", "cloud_enrollment_challenges", "cloud_batch_guards"];
@@ -56,7 +56,7 @@ it("requires subsequent token issuance and persists one owner/client approval ac
   await repo().approve(command());
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_000 })).toBeNull();
   expect(await repo().authorize(claims())).toEqual(owner);
-  await repo().approve({ ...command(), now: now - 10_000 });
+  await repo().approve({ ...command(), expectedRevision: 1, now: now - 10_000 });
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_000 })).toBeNull();
   const state = await snapshot();
   expect(state.cloud_connections).toHaveLength(1);
@@ -92,8 +92,10 @@ it("scopes revocation to owner and client while preserving native account data",
   const before = await snapshot();
   expect(await repo().authorize({ ...claims(), clientId: "other-client" })).toBeNull();
   await repo().revoke({ ...command(), clientId: "other-client" });
-  expect(await snapshot()).toEqual(before);
-  await repo().revoke({ ...command(), now: now + 2000 });
+  const withOtherClient = await snapshot();
+  expect(withOtherClient.cloud_connections).toHaveLength(3);
+  expect(withOtherClient.cloud_connections[2]).toMatchObject({ client_id: "other-client", revision: 1, status: "revoked" });
+  await repo().revoke({ ...command(), expectedRevision: 1, now: now + 2000 });
   expect(await repo().authorize(claims())).toBeNull();
   expect(await repo().authorize({ ...claims(), identity: other.identity })).toEqual(otherOwner);
   const after = await snapshot();
@@ -105,24 +107,24 @@ it("revokes idempotently and reconnects without reviving pre-disconnect tokens",
   const owner = await enroll();
   await repo().approve(command());
   expect(await repo().authorize(claims())).toEqual(owner);
-  const disconnect = { ...command(), now: now + 2500 };
+  const disconnect = { ...command(), expectedRevision: 1, now: now + 2500 };
   await repo().revoke(disconnect);
   const before = await snapshot();
   await repo().revoke(disconnect);
   expect(await snapshot()).toEqual(before);
   expect(await repo().authorize({ ...claims(), now: now + 10_000 })).toBeNull();
-  await repo().approve({ ...command(), now: now + 3000 });
+  await repo().approve({ ...command(), expectedRevision: 2, now: now + 3000 });
   expect(await repo().authorize({ ...claims(), now: now + 10_000 })).toBeNull();
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_004, now: now + 4000 })).toEqual(owner);
-  await repo().approve(command());
-  expect((await snapshot()).cloud_connections[0]).toMatchObject({ token_not_before: 1_800_000_004 });
+  await repo().approve({ ...command(), expectedRevision: 3 });
+  expect((await snapshot()).cloud_connections[0]).toMatchObject({ revision: 4, token_not_before: 1_800_000_004 });
 });
 
 it("keeps the disconnect token fence even when a reconnect command has an older clock", async () => {
   const owner = await enroll();
   await repo().approve(command());
-  await repo().revoke({ ...command(), now: now + 5000 });
-  await repo().approve(command());
+  await repo().revoke({ ...command(), expectedRevision: 1, now: now + 5000 });
+  await repo().approve({ ...command(), expectedRevision: 2 });
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_005, now: now + 6000 })).toBeNull();
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_006, now: now + 6000 })).toEqual(owner);
 });
@@ -160,7 +162,7 @@ it("denies an existing connection as soon as its approving device is revoked", a
 it("concurrent authorization cannot reactivate a revoked connection", async () => {
   await enroll();
   await repo().approve(command());
-  await Promise.all([repo().revoke(command()), ...Array.from({ length: 12 }, () => repo().authorize(claims()))]);
+  await Promise.all([repo().revoke({ ...command(), expectedRevision: 1 }), ...Array.from({ length: 12 }, () => repo().authorize(claims()))]);
   const before = await snapshot();
   const results = await Promise.all(Array.from({ length: 12 }, () => repo().authorize(claims())));
   expect(results).toEqual(Array(12).fill(null));
@@ -169,15 +171,20 @@ it("concurrent authorization cannot reactivate a revoked connection", async () =
   expect(before.cloud_batch_guards).toEqual([]);
 });
 
-it("concurrent approvals preserve a single row and the highest token fence", async () => {
+it("concurrent same-generation approvals accept exactly one command", async () => {
   const owner = await enroll();
-  await Promise.all([6000, 1000, 4000, 0].map((offset) => repo().approve({ ...command(), now: now + offset })));
+  const results = await Promise.allSettled([6000, 1000, 4000, 0].map((offset) => repo().approve({ ...command(), now: now + offset })));
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+  for (const result of results) if (result.status === "rejected") expect(result.reason).toMatchObject({ code: "connection_conflict" });
   const state = await snapshot();
   expect(state.cloud_connections).toHaveLength(1);
-  expect(state.cloud_connections[0]).toMatchObject({ token_not_before: 1_800_000_007 });
+  expect(state.cloud_connections[0]).toMatchObject({ revision: 1, status: "active" });
   expect(state.cloud_batch_guards).toEqual([]);
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_006, now: now + 7000 })).toBeNull();
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_007, now: now + 7000 })).toEqual(owner);
+  const accepted = results.findIndex((result) => result.status === "fulfilled");
+  const fence = [1_800_000_007, 1_800_000_002, 1_800_000_005, 1_800_000_001][accepted];
+  expect(state.cloud_connections[0]).toMatchObject({ token_not_before: fence });
+  expect(await repo().authorize({ ...claims(), tokenIssuedAt: fence - 1, now: now + 7000 })).toBeNull();
+  expect(await repo().authorize({ ...claims(), tokenIssuedAt: fence, now: now + 7000 })).toEqual(owner);
 });
 
 it("legacy subscriptions and businesses cannot approve a cloud connection", async () => {
@@ -205,7 +212,10 @@ it.each(fields.flatMap((field) => invalidIdentifiers.map((invalid, index) => ({ 
   const input = withField(field, invalid);
   await expectCode(unavailable.approve(input), "invalid_input");
   await expectCode(unavailable.revoke(input), "invalid_input");
-  if (field !== "deviceKeyId") expect(await unavailable.authorize({ ...claims(), identity: input.identity, clientId: input.clientId })).toBeNull();
+  if (field !== "deviceKeyId") {
+    expect(await unavailable.authorize({ ...claims(), identity: input.identity, clientId: input.clientId })).toBeNull();
+    expect(await unavailable.getState({ identity: input.identity, clientId: input.clientId })).toBeNull();
+  }
 });
 
 it("denies malformed runtime context before touching D1", async () => {
@@ -215,6 +225,7 @@ it("denies malformed runtime context before touching D1", async () => {
     await expectCode(unavailable.approve(value as ReturnType<typeof command>), "invalid_input");
     await expectCode(unavailable.revoke(value as ReturnType<typeof command>), "invalid_input");
     expect(await unavailable.authorize(value as ReturnType<typeof claims>)).toBeNull();
+    expect(await unavailable.getState(value as ReturnType<typeof command>)).toBeNull();
   }
 });
 
@@ -224,6 +235,7 @@ it.each(fields)("preserves U+FFFD and supplementary characters in %s without mal
   await repo().approve(valid);
   const authorized = { ...claims(), identity: valid.identity, clientId: valid.clientId };
   expect(await repo().authorize(authorized)).toEqual(owner);
+  expect(await repo().getState({ identity: valid.identity, clientId: valid.clientId })).toEqual({ revision: 1, status: "active" });
   const before = await snapshot();
   for (const invalid of ["\ud800", "\udfff"]) {
     const malformed = withField(field, invalid);
@@ -240,6 +252,7 @@ it.each(fields)("preserves U+FFFD and supplementary characters in %s without mal
   }
   await repo().approve(supplementary);
   expect(await repo().authorize({ ...claims(), identity: supplementary.identity, clientId: supplementary.clientId })).not.toBeNull();
+  expect(await repo().getState({ identity: supplementary.identity, clientId: supplementary.clientId })).toEqual({ revision: 1, status: "active" });
 });
 
 it("keeps SQL-looking, NUL, whitespace, case and maximum-length client identifiers exact", async () => {
@@ -255,15 +268,16 @@ it("keeps SQL-looking, NUL, whitespace, case and maximum-length client identifie
 it.each(["approve", "revoke"] as const)("rolls back %s and the assertion guard on a late D1 failure", async (method) => {
   await enroll();
   if (method === "revoke") await repo().approve(command());
+  const input = { ...command(), expectedRevision: method === "revoke" ? 1 : 0 };
   const before = await snapshot();
   await env.DB.prepare("CREATE TRIGGER reject_connection_guard_delete BEFORE DELETE ON cloud_batch_guards BEGIN SELECT RAISE(ABORT, 'private SQL failure'); END").run();
   try {
-    await expectCode(repo()[method](command()), "storage_unavailable");
+    await expectCode(repo()[method](input), "storage_unavailable");
     expect(await snapshot()).toEqual(before);
   } finally {
     await env.DB.prepare("DROP TRIGGER reject_connection_guard_delete").run();
   }
-  await repo()[method](command());
+  await repo()[method](input);
   expect((await snapshot()).cloud_batch_guards).toEqual([]);
 });
 
@@ -286,6 +300,7 @@ it("sanitizes real D1 mutation and authorization failures", async () => {
     await expectCode(repo().approve(command()), "storage_unavailable");
     await expectCode(repo().revoke(command()), "storage_unavailable");
     await expectCode(repo().authorize(claims()), "storage_unavailable");
+    await expectCode(repo().getState(command()), "storage_unavailable");
   } finally {
     await env.DB.prepare("ALTER TABLE unavailable_connections RENAME TO cloud_connections").run();
   }
@@ -297,7 +312,160 @@ it("sanitizes failed authority re-reads after a mutation batch failure", async (
     await expectCode(repo().approve(command()), "storage_unavailable");
     await expectCode(repo().revoke(command()), "storage_unavailable");
     await expectCode(repo().authorize(claims()), "storage_unavailable");
+    await expectCode(repo().getState(command()), "storage_unavailable");
   } finally {
     await env.DB.prepare("ALTER TABLE unavailable_identities RENAME TO cloud_identities").run();
   }
+});
+
+
+it("rejects a delayed approval carrying the pre-disconnect revision even with a later clock", async () => {
+  await enroll();
+  await repo().approve(command());
+  const delayed = { ...command(), expectedRevision: 1, now: now + 10_000 };
+  await repo().revoke({ ...command(), expectedRevision: 1, now: now + 2000 });
+  const before = await snapshot();
+  await expectCode(repo().approve(delayed), "connection_conflict");
+  expect(await snapshot()).toEqual(before);
+});
+
+it("records a first revoke tombstone that blocks a delayed initial approval", async () => {
+  await enroll();
+  await repo().revoke(command());
+  const before = await snapshot();
+  expect(before.cloud_connections).toHaveLength(1);
+  expect(before.cloud_connections[0]).toMatchObject({ revision: 1, status: "revoked" });
+  await expectCode(repo().approve({ ...command(), now: now + 5000 }), "connection_conflict");
+  expect(await snapshot()).toEqual(before);
+});
+
+it("never authorizes a token issued while disconnected through a stale approval", async () => {
+  await enroll();
+  await repo().approve(command());
+  await repo().revoke({ ...command(), expectedRevision: 1, now: now + 2000 });
+  await repo().approve({ ...command(), expectedRevision: 1, now: now + 1000 }).catch(() => undefined);
+  const disconnectedToken = { ...claims(), tokenIssuedAt: 1_800_000_004, now: now + 7000 };
+  expect(await repo().authorize(disconnectedToken)).toBeNull();
+  await repo().approve({ ...command(), expectedRevision: 2, now: now + 6000 });
+  expect(await repo().authorize(disconnectedToken)).toBeNull();
+  expect(await repo().authorize({ ...disconnectedToken, tokenIssuedAt: 1_800_000_007 })).not.toBeNull();
+});
+
+
+it("reads unknown, unapproved, active and revoked state without creating data", async () => {
+  const before = await snapshot();
+  expect(await repo().getState(command())).toBeNull();
+  expect(await snapshot()).toEqual(before);
+  await enroll();
+  const unapproved = await snapshot();
+  expect(await repo().getState(command())).toEqual({ revision: 0, status: "unapproved" });
+  expect(await snapshot()).toEqual(unapproved);
+  await repo().approve(command());
+  expect(await repo().getState(command())).toEqual({ revision: 1, status: "active" });
+  expect(await repo().getState({ ...command(), clientId: "other-client" })).toEqual({ revision: 0, status: "unapproved" });
+  expect(await repo().getState({ ...command(), identity: { ...identity, issuer: "https://ISSUER.example/" } })).toBeNull();
+  await repo().revoke({ ...command(), expectedRevision: 1 });
+  expect(await repo().getState(command())).toEqual({ revision: 2, status: "revoked" });
+});
+
+it.each([undefined, null, "0", true, {}, NaN, Infinity, -1, 0.5, Number.MAX_SAFE_INTEGER + 1])("rejects malformed revision %j before D1 access", async (expectedRevision) => {
+  const unavailable = createCloudConnectionRepository(undefined as never);
+  const input = { ...command(), expectedRevision: expectedRevision as number };
+  await expectCode(unavailable.approve(input), "invalid_input");
+  await expectCode(unavailable.revoke(input), "invalid_input");
+});
+
+it("rejects an omitted expectedRevision before D1 access", async () => {
+  const unavailable = createCloudConnectionRepository(undefined as never);
+  const input = { identity, deviceKeyId: "device", clientId: "chatgpt", now };
+  await expectCode(unavailable.approve(input as ReturnType<typeof command>), "invalid_input");
+  await expectCode(unavailable.revoke(input as ReturnType<typeof command>), "invalid_input");
+});
+
+it.each(["approve", "revoke"] as const)("rejects future %s revisions without table changes", async (method) => {
+  await enroll();
+  const before = await snapshot();
+  await expectCode(repo()[method]({ ...command(), expectedRevision: 1 }), "connection_conflict");
+  expect(await snapshot()).toEqual(before);
+});
+
+it("stale revoke cannot undo a newer explicit approval", async () => {
+  await enroll();
+  await repo().approve(command());
+  await repo().revoke({ ...command(), expectedRevision: 1 });
+  await repo().approve({ ...command(), expectedRevision: 2 });
+  const before = await snapshot();
+  await expectCode(repo().revoke({ ...command(), expectedRevision: 1, now: now + 50_000 }), "connection_conflict");
+  expect(await snapshot()).toEqual(before);
+  expect(await repo().getState(command())).toEqual({ revision: 3, status: "active" });
+});
+
+it("revoked tombstones allow only validated no-op revokes without raising their fence", async () => {
+  const owner = await enroll();
+  await env.DB.prepare("INSERT INTO cloud_devices (device_key_id, owner_id, status) VALUES ('second-device', ?, 'active')").bind(owner.ownerId).run();
+  await repo().revoke(command());
+  const before = await snapshot();
+  for (const expectedRevision of [0, 1]) {
+    await repo().revoke({ ...command(), deviceKeyId: "second-device", expectedRevision, now: now + 50_000 });
+    expect(await snapshot()).toEqual(before);
+  }
+  await expectCode(repo().revoke({ ...command(), expectedRevision: 2 }), "connection_conflict");
+  await expectCode(repo().revoke({ ...command(), deviceKeyId: "missing" }), "device_denied");
+  await env.DB.prepare("UPDATE cloud_devices SET status = 'revoked' WHERE device_key_id = 'second-device'").run();
+  const revokedDevice = await snapshot();
+  await expectCode(repo().revoke({ ...command(), deviceKeyId: "second-device" }), "device_denied");
+  expect(await snapshot()).toEqual(revokedDevice);
+});
+
+it.each([0, 1])("concurrent approve/revoke at revision %j has one atomic winner", async (expectedRevision) => {
+  await enroll();
+  if (expectedRevision === 1) await repo().approve(command());
+  const results = await Promise.allSettled([
+    repo().approve({ ...command(), expectedRevision, now: now + 1000 }),
+    repo().revoke({ ...command(), expectedRevision, now: now + 5000 }),
+  ]);
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+  for (const result of results) if (result.status === "rejected") expect(result.reason).toMatchObject({ code: "connection_conflict" });
+  const winner = results[0].status === "fulfilled" ? "active" : "revoked";
+  expect(await repo().getState(command())).toEqual({ revision: expectedRevision + 1, status: winner });
+  const before = await snapshot();
+  expect(before.cloud_connections[0]).toMatchObject({ token_not_before: winner === "active" ? 1_800_000_002 : 1_800_000_006 });
+  expect(before.cloud_batch_guards).toEqual([]);
+  await expectCode(repo().approve({ ...command(), expectedRevision }), "connection_conflict");
+  if (winner === "active") await expectCode(repo().revoke({ ...command(), expectedRevision }), "connection_conflict");
+  else await repo().revoke({ ...command(), expectedRevision });
+  expect(await snapshot()).toEqual(before);
+});
+
+it("concurrent repeated revokes increment an active generation once", async () => {
+  await enroll();
+  await repo().approve(command());
+  await Promise.all(Array.from({ length: 8 }, () => repo().revoke({ ...command(), expectedRevision: 1, now: now + 2000 })));
+  expect(await repo().getState(command())).toEqual({ revision: 2, status: "revoked" });
+  expect((await snapshot()).cloud_connections[0]).toMatchObject({ token_not_before: 1_800_000_003 });
+});
+
+it("revision exhaustion fails closed while an exhausted tombstone permits a no-op", async () => {
+  await enroll();
+  await repo().approve(command());
+  await env.DB.prepare("UPDATE cloud_connections SET revision = ?").bind(Number.MAX_SAFE_INTEGER - 1).run();
+  await repo().approve({ ...command(), expectedRevision: Number.MAX_SAFE_INTEGER - 1 });
+  expect(await repo().getState(command())).toEqual({ revision: Number.MAX_SAFE_INTEGER, status: "active" });
+  const before = await snapshot();
+  for (const method of ["approve", "revoke"] as const) await expectCode(repo()[method]({ ...command(), expectedRevision: Number.MAX_SAFE_INTEGER }), "connection_conflict");
+  expect(await snapshot()).toEqual(before);
+  await env.DB.prepare("UPDATE cloud_connections SET status = 'revoked'").run();
+  const tombstone = await snapshot();
+  await repo().revoke({ ...command(), expectedRevision: Number.MAX_SAFE_INTEGER, now: now + 5000 });
+  expect(await snapshot()).toEqual(tombstone);
+  await expectCode(repo().approve({ ...command(), expectedRevision: Number.MAX_SAFE_INTEGER }), "connection_conflict");
+  expect(await snapshot()).toEqual(tombstone);
+});
+
+it.each([0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1])("D1 rejects invalid persisted revision %j", async (revision) => {
+  await enroll();
+  await repo().approve(command());
+  const before = await snapshot();
+  await expect(env.DB.prepare("UPDATE cloud_connections SET revision = ?").bind(revision).run()).rejects.toThrow();
+  expect(await snapshot()).toEqual(before);
 });
