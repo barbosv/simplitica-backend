@@ -11,16 +11,16 @@ Owner-driven development setup on November 14, 2026:
 | Setting | Development value/status |
 | --- | --- |
 | Issuer | `https://dev-i8usug5fp48kepvr.us.auth0.com/` |
-| Native client | Separate first-party development app; isolated official SDK qualifier passed20 simulator tests; live login/identity proof pending |
+| Native client | Separate first-party development app; isolated official SDK qualifier passed20 simulator tests; live native login succeeded; private identity comparison pending |
 | ChatGPT client | Dedicated Regular Web third-party client `tpc_5RjUULWf1V9koMnfWj1Xg3` (confirmed against the signed-in development dashboard) |
-| Client authentication | Client Secret (Post); secret stays in Auth0/ChatGPT secure configuration |
+| Client authentication | Client Secret (Post); secret configured in Auth0/ChatGPT; controlled runner uses protected disposable input and process memory only |
 | Canonical resource/API identifier | `https://simpli-invoice-mcp-dev.simplitica.co/mcp` (deployed isolated development custom domain) |
 | API permission | `probe:read`; explicit user-delegated client grant only |
 | Authoring/payment access | None |
 | Apple | Connection test succeeded in hosted flow; domain-level promotion reported |
 | Resource compatibility | Tenant profile enabled, owner confirmed |
-| Refresh | Grant enabled, rotation enabled, overlap 0 shown in screenshot; live behavior untested |
-| Apple identity claim | Scoped development Action deployed and applied; not yet confirmed in signed API tokens |
+| Refresh | Grant enabled, rotation enabled, overlap 0 shown in screenshot; live rotation, replay-family invalidation and refresh revocation passed |
+| Apple identity claim | Scoped development Action deployed and applied; confirmed in signed hosted initial/rotated API tokens; native signed proof pending |
 | Actual ChatGPT callback | `https://chatgpt.com/connector_platform_oauth_redirect`; copied from the current portal and saved to the development client |
 
 An earlier standard first-party ChatGPT development client was superseded during setup. Do not use it for strict third-party qualification. Do not modify the native client into a third-party client. Neither deletion nor broader system-API access is required.
@@ -144,11 +144,11 @@ Request only the explicit API permission plus `offline_access` when supported. I
 | Gate | Required real evidence | Current status |
 | --- | --- | --- |
 | Discovery | Canonical resource metadata and unmodified provider discovery | Development issuer and canonical probe metadata reachable over HTTPS; anonymous/invalid-token challenges verified |
-| Scope/resource | S256 authorization and token exchange; signed API JWT with exact audience/client/scope/Apple claim | Live S256/resource/API-only scope audit passed; accepted signed-token checks inferred from probe; controlled token audit pending |
+| Scope/resource | S256 authorization and token exchange; signed API JWT with exact audience/client/scope/Apple claim | Live S256/resource/API-only scope audit passed; accepted signed-token checks inferred from probe; controlled cryptographic audit passed for expected audience, exact client, required scope and Apple claim |
 | First milestone | ChatGPT initializes, lists and invokes `qualification_probe` through authenticated development connection | Passed November 14, 2026: installed development plugin, execution trace “Checked Synthetic Development Access”, result `{"success":true,"probe":"synthetic-development"}` |
-| Native/hosted identity | Same verified opaque Apple identity in separately validated native and hosted flows | Pending; native SDK not integrated |
-| Refresh | New refresh token after exchange; old-token reuse rejected outside overlap, with token-family behavior recorded | Pending |
-| Disconnect/revocation | Revoked grant/refresh token cannot renew; local/probe access denial behavior documented | Pending |
+| Native/hosted identity | Same verified opaque Apple identity in separately validated native and hosted flows | Official SDK qualifier tested and native login succeeded; private signed identity comparison pending |
+| Refresh | New refresh token after exchange; old-token reuse rejected outside overlap, with token-family behavior recorded | Passed: rotation changed token, replay and replacement-family refresh returned invalid_grant |
+| Disconnect/revocation | Revoked grant/refresh token cannot renew; local/probe access denial behavior documented | Refresh revocation passed; unexpired access JWTs can remain valid until expiry |
 
 Keep sanitized evidence: date, client type, endpoint, requested scope names, HTTP status, verifier outcome and token lifetime, without the tokens or personal identity values. A screenshot of hosted Apple connection success is useful but does not pass the signed-token/native-continuity gates.
 
@@ -181,7 +181,7 @@ The owner entered the third-party development client secret directly in ChatGPT 
 - Portal configuration: predefined third-party client, `client_secret_post`, default `probe:read`, base `offline_access`, OIDC disabled; discovered endpoints and resource left unchanged.
 - No tokens, secrets or opaque personal Apple identifiers were collected. No customer or invoice bindings exist in this Worker.
 
-Because the deployed verifier requires RS256 issuer/audience/client/scope/Apple-claim validation for MCP POST, the successful call is evidence that this request passed those checks. This is an inference from deployed code behavior and visible execution, not a captured JWT audit. The initial ChatGPT authorization redirect was not captured, so actual S256/resource/scope request details remain unverified. Refresh rotation/reuse, revocation behavior and native/hosted identity continuity remain pending.
+Because the deployed verifier requires RS256 issuer/audience/client/scope/Apple-claim validation for MCP POST, the successful call is evidence that this request passed those checks. This is an inference from deployed code behavior and visible execution, not a captured JWT audit. At this initial probe milestone, the authorization redirect had not been captured and lifecycle/native checks were pending. The subsequent provider audit and controlled hosted checks below establish S256/resource/scope, signed hosted tokens, rotation/reuse and revocation. Native/hosted identity comparison remains pending.
 
 ## Additional provider evidence
 
@@ -189,11 +189,11 @@ Auth0 development tenant logs independently confirm Apple login at `2026-11-14T1
 
 The versioned development Action source now lives at `scripts/auth0/development-apple-identity.cjs`; tests execute that exact artifact. Its additional audit emits fixed labels and booleans only after identity/audience guards: authorization S256 presence, exact resource match, API/offline scope presence and unexpected-scope status, or a refresh-flow marker. It never logs request bodies, raw query values, personal identity, client secrets or tokens. Logging records observations and does not turn provider configuration or synthetic events into live qualification evidence.
 
-## Controlled live runner (ready; owner input pending)
+## Controlled live runner
 
 `npm run qualify:oauth` is a development OAuth **client**, not an authorization server. It uses fixed development endpoints and a temporary exact `http://127.0.0.1:8792/callback` allowlist entry. The existing ChatGPT callback must be preserved. Only start after the owner supplies the secret directly in the disposable ignored local file `.superpowers/sdd/chatgpt-integration/auth0-client-secret` with mode 0600. The runner rejects symlinks, another owner, group/world access and oversize input; removes that one-use file after reading, and keeps tokens/identities in process memory. Never paste credentials into chat or command arguments.
 
-The runner requests two fresh S256/Apple authorizations. First it verifies the signed API token, rotates a refresh token, attempts reuse and verifies family invalidation. Then a fresh login checks refresh before revoking the current token and proving subsequent refresh denial. Only a recognized provider `invalid_grant` counts as denial; network errors do not qualify. The final local native proof on port8793 requires a separately signed native-development token with matching opaque Apple identity. Native client/audience/scope are separate from the ChatGPT client: `WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa`, `https://simpli-invoice-native-dev.simplitica.co/api`, `qualification:read`. The separate native API/grant/callback/claim configuration is prepared; actual native login and signed identity proof remain pending. No unexpired access-JWT revocation is inferred.
+The runner requests two fresh S256/Apple authorizations. First it verifies the signed API token, rotates a refresh token, attempts reuse and verifies family invalidation. Then a fresh login checks refresh before revoking the current token and proving subsequent refresh denial. Only a recognized provider `invalid_grant` counts as denial; network errors do not qualify. The final local native proof on port8793 requires a separately signed native-development token with matching opaque Apple identity. Native client/audience/scope are separate from the ChatGPT client: `WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa`, `https://simpli-invoice-native-dev.simplitica.co/api`, `qualification:read`. The separate native API/grant/callback/claim configuration is prepared; actual native login succeeded; signed identity comparison remains pending. No unexpired access-JWT revocation is inferred.
 
 Temporary loopback callback must be removed after testing. Authorization codes are single-use in the local callback; wrong/duplicate state, duplicate code, malformed HTTP targets, wrong Host/path/method and timeout are rejected. A real child-process TCP regression verifies malformed targets cannot crash or leak request text.
 
@@ -201,8 +201,15 @@ Live audit at `2026-11-14T19:49:32.861Z` recorded authorization with S256=true, 
 
 ## Native qualifier and prepared development configuration
 
-The isolated iOS artifact is on `codex/chatgpt-native-qualification` in `voice-invoice`, runtime commit `e3e101f`. Official Auth0.swift3.3.1, dedicated qualification bundle/callback and device-only Keychain namespace; no production app project/source changed. Fresh independent review passed and independently read the result bundle:20 XCTest tests passed, zero failed/skipped on arm64 iPhone17Pro/iOS26.5. Actual native Apple login is still pending; local SDK/Keychain tests are not identity-continuity evidence. Main-app baseline executed zero tests because the inherited MLKit simulator configuration excludes the available architecture.
+The isolated iOS artifact is on `codex/chatgpt-native-qualification` in `voice-invoice`, runtime commit `e3e101f`. Official Auth0.swift3.3.1, dedicated qualification bundle/callback and device-only Keychain namespace; no production app project/source changed. Fresh independent review passed and independently read the result bundle:20 XCTest tests passed, zero failed/skipped on arm64 iPhone17Pro/iOS26.5. Actual native Apple login and consent subsequently succeeded in the simulator, showing “Development session stored. Local proof has not run.” Local SDK/Keychain tests and this UI result are not signed identity-continuity evidence. Main-app baseline executed zero tests because the inherited MLKit simulator configuration excludes the available architecture.
 
 Prepared native API `6af8c0b132b9f616a47057ac`: Auth0 profile/RS256; access lifetime300sec, explicit consent, offline access, per-app user-delegated authorization, no machine-to-machine client access. Only `qualification:read` is explicitly granted to the native development client, with no anonymous grant or MCP API permission. Native client keeps Authorization Code and Refresh Token grants, with Implicit disabled, rotation overlap0, idle3600sec and maximum86400sec. Existing native callbacks are preserved; the exact `co.simplitica.simpli-invoice.qualification://dev-i8usug5fp48kepvr.us.auth0.com/ios/co.simplitica.simpli-invoice.qualification/callback` was added with non-verifiable callback confirmation enabled. OIDC remains enabled for native login and disabled for ChatGPT.
 
-The reviewed Action extension was deployed and built-in synthetic native event test returned the expected namespaced claim and safe boolean audit; it does not qualify real native tokens. The owner is currently on a phone without the confidential client secret available. The one-use local secret input file is still empty, and no controlled refresh/replay/revocation flow or temporary confidential loopback callback registration has run. Resume those owner-assisted tests when desktop access is available. Keep dependent owner/enrollment/shared-persistence implementation gated by complete live provider qualification.
+The reviewed Action extension was deployed and built-in synthetic native event test returned the expected namespaced claim and safe boolean audit; it does not qualify real native tokens. The owner supplied the secret directly in the protected one-use file, which the runner read and deleted. Both controlled hosted stages passed: signed initial/rotated token verification and identity continuity, refresh rotation, replay rejection and token-family invalidation, then a fresh login with successful refresh followed by revocation and invalid_grant on renewal. The temporary confidential-client loopback callback was removed and saved while preserving the ChatGPT callback. The native comparison timed out after ten minutes while the simulator was recovered; the runner exited with native_proof_timeout and discarded its in-memory reference. Native Apple login and consent then succeeded. A focused continuity retry is required; no full provider pass is claimed. Keep dependent owner/enrollment/shared-persistence implementation gated by complete live provider qualification.
+
+
+## Controlled hosted live outcomes — November 14, 2026
+
+Both owner-authenticated hosted stages passed in the reviewed runner. Rotation/reuse verified signed initial and rotated API JWTs, unchanged opaque identity, changed refresh token, invalid_grant on old-token replay and invalid_grant on the replacement family. A fresh authorization then verified initial/rotated signed identity continuity, successful refresh, revocation and invalid_grant on subsequent refresh. No transport failure was counted as a denial. The temporary localhost callback was removed and the ChatGPT callback preserved.
+
+The native proof stage timed out during simulator recovery; the overall runner exited with native_proof_timeout. Recovery and native Apple login/consent succeeded afterward, with credentials stored by the official SDK. The remaining private identity comparison needs a focused retry. These hosted outcomes do not establish immediate revocation of existing access JWTs.

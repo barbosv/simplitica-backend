@@ -26,8 +26,8 @@ Files: `scripts/qualification/managed-oauth.ts`, `test/managed-oauth-live-runner
 - [x] Write RED tests for refresh rotation, unchanged refresh rejection, replay/family denial, revoke denial and redacted failures using an actual disposable HTTP issuer fixture.
 - [x] Implement in-memory token lifecycle checks; verify real JWTs through `jose` and fixed development config.
 - [x] Run full Node suite, lint/build, independent review, commit and push feature branch.
-- [ ] Register exact temporary development loopback callback; owner enters secret directly into a protected ignored local file. Run two owner-authenticated stages (reuse detection invalidates the first token family; revocation needs a fresh login).
-- [ ] Record sanitized live provider verdicts; remove temporary callback/config after testing without changing ChatGPT's existing callback.
+- [x] Register exact temporary development loopback callback; owner enters secret directly into a protected ignored local file. Run two owner-authenticated stages (reuse detection invalidates the first token family; revocation needs a fresh login).
+- [x] Record sanitized live provider verdicts; remove temporary callback/config after testing without changing ChatGPT's existing callback.
 
 ## Task 2 — Native qualification
 
@@ -42,4 +42,4 @@ Workspace: isolated `voice-invoice`, branch `codex/chatgpt-native-qualification`
 
 After provider gates pass, write concrete D1 account/subscription, records/sync/numbering, native outbox and MCP authoring plans against current code. Preserve one owner/business/subscription, StoreKit lineage uniqueness, entitlement rules, decimal-string USD calculations, revision/idempotency and atomic D1 batch gates. Every D1 concurrency guarantee requires real workerd/D1 tests. Keep finalization/PDF/email/text native; no payment or send tools. User authorizes full implementation, feature-branch pushes and development testing; production rollout remains excluded.
 
-Prepared native provider config and independently reviewed SDK artifact are complete; owner-assisted live login/private comparison remain pending. Native main-app baseline attempt failed before executing tests (inherited simulator architecture issue); the separate qualifier has20 actual passing tests.
+Prepared native provider config and independently reviewed SDK artifact are complete; owner-assisted native login succeeded; private signed comparison remains pending. Native main-app baseline attempt failed before executing tests (inherited simulator architecture issue); the separate qualifier has20 actual passing tests.
