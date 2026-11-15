@@ -11,7 +11,7 @@ Owner-driven development setup on November 14, 2026:
 | Setting | Development value/status |
 | --- | --- |
 | Issuer | `https://dev-i8usug5fp48kepvr.us.auth0.com/` |
-| Native client | Separate first-party native app; created, no SDK validation yet |
+| Native client | Separate first-party development app; isolated official SDK qualifier passed20 simulator tests; live login/identity proof pending |
 | ChatGPT client | Dedicated Regular Web third-party client `tpc_5RjUULWf1V9koMnfWj1Xg3` (confirmed against the signed-in development dashboard) |
 | Client authentication | Client Secret (Post); secret stays in Auth0/ChatGPT secure configuration |
 | Canonical resource/API identifier | `https://simpli-invoice-mcp-dev.simplitica.co/mcp` (deployed isolated development custom domain) |
@@ -67,7 +67,7 @@ The probe uses a per-request JWKS resolver with a network timeout. It does not k
 
 The Worker requires the configured namespaced string claim in the verified API token. A plain `sub`, email (including Apple relay), user-supplied business UUID, or decoded unsigned JWT is insufficient. No production owner is created and the claim is never echoed by the probe.
 
-Configure a Post Login Action **in the development tenant only**, scoped to the exact third-party client and probe audience. Auth0's trusted `event.connection` and `event.user.identities` supply the Apple connection and opaque provider identity. Do not derive it by stripping `apple|` from the Auth0 subject, and do not copy a value from user-editable metadata.
+Configure a Post Login Action **in the development tenant only**, scoped to the exact ChatGPT development client/MCP audience or the separate native development client/native audience. Auth0's trusted `event.connection` and `event.user.identities` supply the Apple connection and opaque provider identity. Do not derive it by stripping `apple|` from the Auth0 subject, and do not copy a value from user-editable metadata.
 
 The following Action was deployed as **Simpli Invoice Dev Apple Identity** and applied to the development Post Login flow on November 14, 2026. The dashboard confirmed all flow changes live. Built-in tests with synthetic events verified claim issuance for Apple, rejection of non-Apple login and wrong audience, and no-op behavior for another client. These are not real signed-token tests. The repository does not apply the Action automatically:
 
@@ -75,9 +75,10 @@ The following Action was deployed as **Simpli Invoice Dev Apple Identity** and a
 /* global exports, console */
 // Development tenant only. Never log request bodies, tokens, identities or query values.
 exports.onExecutePostLogin = async (event, api) => {
-  const clientId = 'tpc_5RjUULWf1V9koMnfWj1Xg3';
-  const resource = 'https://simpli-invoice-mcp-dev.simplitica.co/mcp';
-  if (event.client.client_id !== clientId) return;
+  const native = event.client.client_id === 'WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa';
+  if (!native && event.client.client_id !== 'tpc_5RjUULWf1V9koMnfWj1Xg3') return;
+  const resource = native ? 'https://simpli-invoice-native-dev.simplitica.co/api'
+    : 'https://simpli-invoice-mcp-dev.simplitica.co/mcp';
   if (event.resource_server?.identifier !== resource) {
     api.access.deny('Development probe audience required');
     return;
@@ -91,19 +92,28 @@ exports.onExecutePostLogin = async (event, api) => {
     api.access.deny('A single verified Apple identity is required');
     return;
   }
+  const label = native ? 'development-native-qualification' : 'development-oauth-qualification';
   if (event.transaction?.protocol === 'oauth2-refresh-token') {
-    console.log(JSON.stringify({ event: 'development-oauth-qualification', flow: 'refresh' }));
+    console.log(JSON.stringify({ event: label, flow: 'refresh' }));
   } else {
     const query = event.request?.query ?? {};
     const scopes = typeof query.scope === 'string' ? query.scope.split(/\s+/).filter(Boolean) : [];
-    console.log(JSON.stringify({
-      event: 'development-oauth-qualification', flow: 'authorization',
+    const observation = {
+      event: label, flow: 'authorization',
       pkceS256: query.code_challenge_method === 'S256'
         && typeof query.code_challenge === 'string' && query.code_challenge.length > 0,
-      resourceMatches: query.resource === resource,
-      probeScope: scopes.includes('probe:read'), offlineAccess: scopes.includes('offline_access'),
-      unexpectedScopes: scopes.some(scope => scope !== 'probe:read' && scope !== 'offline_access'),
-    }));
+    };
+    if (native) {
+      console.log(JSON.stringify({ ...observation, audienceMatches: query.audience === resource,
+        qualificationScope: scopes.includes('qualification:read'), offlineAccess: scopes.includes('offline_access'),
+        unexpectedScopes: scopes.some(scope => !['openid', 'profile', 'offline_access', 'qualification:read'].includes(scope)),
+      }));
+    } else {
+      console.log(JSON.stringify({ ...observation, resourceMatches: query.resource === resource,
+        probeScope: scopes.includes('probe:read'), offlineAccess: scopes.includes('offline_access'),
+        unexpectedScopes: scopes.some(scope => scope !== 'probe:read' && scope !== 'offline_access'),
+      }));
+    }
   }
   api.accessToken.setCustomClaim(
     'https://simplitica.co/apple_identity', identities[0].user_id
@@ -183,8 +193,16 @@ The versioned development Action source now lives at `scripts/auth0/development-
 
 `npm run qualify:oauth` is a development OAuth **client**, not an authorization server. It uses fixed development endpoints and a temporary exact `http://127.0.0.1:8792/callback` allowlist entry. The existing ChatGPT callback must be preserved. Only start after the owner supplies the secret directly in the disposable ignored local file `.superpowers/sdd/chatgpt-integration/auth0-client-secret` with mode 0600. The runner rejects symlinks, another owner, group/world access and oversize input; removes that one-use file after reading, and keeps tokens/identities in process memory. Never paste credentials into chat or command arguments.
 
-The runner requests two fresh S256/Apple authorizations. First it verifies the signed API token, rotates a refresh token, attempts reuse and verifies family invalidation. Then a fresh login checks refresh before revoking the current token and proving subsequent refresh denial. Only a recognized provider `invalid_grant` counts as denial; network errors do not qualify. The final local native proof on port8793 requires a separately signed native-development token with matching opaque Apple identity. Native client/audience/scope are separate from the ChatGPT client: `WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa`, `https://simpli-invoice-native-dev.simplitica.co/api`, `qualification:read`. Provider native API/grant/claim configuration and actual native login remain pending. No unexpired access-JWT revocation is inferred.
+The runner requests two fresh S256/Apple authorizations. First it verifies the signed API token, rotates a refresh token, attempts reuse and verifies family invalidation. Then a fresh login checks refresh before revoking the current token and proving subsequent refresh denial. Only a recognized provider `invalid_grant` counts as denial; network errors do not qualify. The final local native proof on port8793 requires a separately signed native-development token with matching opaque Apple identity. Native client/audience/scope are separate from the ChatGPT client: `WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa`, `https://simpli-invoice-native-dev.simplitica.co/api`, `qualification:read`. The separate native API/grant/callback/claim configuration is prepared; actual native login and signed identity proof remain pending. No unexpired access-JWT revocation is inferred.
 
 Temporary loopback callback must be removed after testing. Authorization codes are single-use in the local callback; wrong/duplicate state, duplicate code, malformed HTTP targets, wrong Host/path/method and timeout are rejected. A real child-process TCP regression verifies malformed targets cannot crash or leak request text.
 
 Live audit at `2026-11-14T19:49:32.861Z` recorded authorization with S256=true, resource match=true, probe scope=true, offline access=true, unexpected scopes=false. Its code exchange succeeded at `19:49:34.421Z`. These are real Auth0 Action-execution logs, unlike the earlier built-in synthetic Action test.
+
+## Native qualifier and prepared development configuration
+
+The isolated iOS artifact is on `codex/chatgpt-native-qualification` in `voice-invoice`, runtime commit `e3e101f`. Official Auth0.swift3.3.1, dedicated qualification bundle/callback and device-only Keychain namespace; no production app project/source changed. Fresh independent review passed and independently read the result bundle:20 XCTest tests passed, zero failed/skipped on arm64 iPhone17Pro/iOS26.5. Actual native Apple login is still pending; local SDK/Keychain tests are not identity-continuity evidence. Main-app baseline executed zero tests because the inherited MLKit simulator configuration excludes the available architecture.
+
+Prepared native API `6af8c0b132b9f616a47057ac`: Auth0 profile/RS256; access lifetime300sec, explicit consent, offline access, per-app user-delegated authorization, no machine-to-machine client access. Only `qualification:read` is explicitly granted to the native development client, with no anonymous grant or MCP API permission. Native client keeps Authorization Code and Refresh Token grants, with Implicit disabled, rotation overlap0, idle3600sec and maximum86400sec. Existing native callbacks are preserved; the exact `co.simplitica.simpli-invoice.qualification://dev-i8usug5fp48kepvr.us.auth0.com/ios/co.simplitica.simpli-invoice.qualification/callback` was added with non-verifiable callback confirmation enabled. OIDC remains enabled for native login and disabled for ChatGPT.
+
+The reviewed Action extension was deployed and built-in synthetic native event test returned the expected namespaced claim and safe boolean audit; it does not qualify real native tokens. The owner is currently on a phone without the confidential client secret available. The one-use local secret input file is still empty, and no controlled refresh/replay/revocation flow or temporary confidential loopback callback registration has run. Resume those owner-assisted tests when desktop access is available. Keep dependent owner/enrollment/shared-persistence implementation gated by complete live provider qualification.
