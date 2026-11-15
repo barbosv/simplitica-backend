@@ -23,8 +23,16 @@ type EnrollmentInput = {
 type LedgerRow = { evidence_hash: string; response_snapshot: string };
 
 function opaque(value: unknown): asserts value is string {
-  // Opaque means exact JS strings, including whitespace, NUL and provider prefixes.
-  if (typeof value !== "string" || value.length === 0 || value.length > 1024) {
+  // D1 replaces unpaired surrogates with U+FFFD. Reject those lossy inputs,
+  // preserving exact well-formed Unicode, whitespace, NUL and provider prefixes.
+  // Unicode mode treats valid surrogate pairs as one supplementary code point;
+  // this range therefore matches only unpaired high or low surrogates.
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 1024 ||
+    /[\uD800-\uDFFF]/u.test(value)
+  ) {
     throw new CloudAccountError("invalid_input");
   }
 }

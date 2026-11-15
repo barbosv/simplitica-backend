@@ -348,3 +348,77 @@ it("enforces owner relationships, one business/identity/lineage per owner and va
     expect(await snapshot()).toEqual(before);
   }
 });
+
+const malformedUnicode = [
+  { label: "lone high surrogate", invalid: "\ud800", representable: "\ufffd" },
+  { label: "lone low surrogate", invalid: "\udfff", representable: "\ufffd" },
+  { label: "embedded high surrogate", invalid: "before\ud800after", representable: "before\ufffdafter" },
+  { label: "embedded low surrogate", invalid: "before\udfffafter", representable: "before\ufffdafter" },
+];
+const opaqueFields = ["issuer", "appleIdentity", "deviceKeyId", "appSlug", "originalTransactionId"] as const;
+function withOpaqueField(field: typeof opaqueFields[number], value: string) {
+  const result = evidence();
+  if (field === "issuer" || field === "appleIdentity") result.identity[field] = value;
+  else if (field === "deviceKeyId") result.deviceKeyId = value;
+  else result.purchase[field] = value;
+  return result;
+}
+const malformedOpaqueCases = opaqueFields.flatMap((field) =>
+  malformedUnicode.map((value) => ({ field, ...value })),
+);
+
+it.each(malformedOpaqueCases.filter(({ field }) => field === "issuer" || field === "appleIdentity" || field === "deviceKeyId"))(
+  "rejects $label in issueChallenge $field without writes",
+  async ({ field, invalid }) => {
+    const before = await snapshot();
+    await expectCode(issue(withOpaqueField(field, invalid)), "invalid_input");
+    expect(await snapshot()).toEqual(before);
+  },
+);
+
+it.each(malformedOpaqueCases)(
+  "rejects $label in commitEnrollment $field without aliasing replacement characters",
+  async ({ field, invalid, representable }) => {
+    // A valid replacement-character context must never authorize the distinct
+    // malformed JS string that D1 would otherwise coerce to those same bytes.
+    await issue(withOpaqueField(field, representable));
+    const before = await snapshot();
+    await expectCode(commit(withOpaqueField(field, invalid)), "invalid_input");
+    expect(await snapshot()).toEqual(before);
+  },
+);
+
+it.each(malformedOpaqueCases.filter(({ field }) => field === "issuer" || field === "appleIdentity"))(
+  "rejects $label in findOwner $field without aliasing an existing owner",
+  async ({ field, invalid, representable }) => {
+    const valid = withOpaqueField(field, representable);
+    await issue(valid);
+    await commit(valid);
+    const before = await snapshot();
+    await expectCode(repo().findOwner(withOpaqueField(field, invalid).identity), "invalid_input");
+    expect(await snapshot()).toEqual(before);
+  },
+);
+
+it("preserves literal U+FFFD and valid supplementary surrogate pairs as distinct opaque identifiers", async () => {
+  const receipts = [];
+  for (const [index, character] of ["\ufffd", "\ud83d\ude00"].entries()) {
+    const value: VerifiedEnrollmentEvidence = {
+      identity: { issuer: character, appleIdentity: character },
+      deviceKeyId: character,
+      purchase: { appSlug: character, environment: "Sandbox", originalTransactionId: character },
+    };
+    const key = hash(index + 1);
+    await issue(value, key);
+    const receipt = await commit(value, key);
+    receipts.push(receipt);
+    expect(await repo().findOwner(value.identity)).toEqual({ ownerId: receipt.ownerId, businessId: receipt.businessId });
+    expect(await commit(value, key)).toEqual(receipt);
+    const state = await snapshot();
+    expect(state.cloud_identities[index]).toMatchObject({ issuer: character, apple_identity: character });
+    expect(state.cloud_devices[index]).toMatchObject({ device_key_id: character });
+    expect(state.cloud_purchase_lineages[index]).toMatchObject({ app_slug: character, original_transaction_id: character });
+  }
+  expect(receipts[0].ownerId).not.toBe(receipts[1].ownerId);
+  expect((await snapshot()).cloud_owners).toHaveLength(2);
+});

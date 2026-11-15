@@ -1,3 +1,5 @@
+// All opaque identifiers below must be nonempty, well-formed Unicode strings
+// of at most 1024 UTF-16 code units. No trimming, normalization or case folding.
 export type CloudIdentity = { issuer: string; appleIdentity: string };
 
 // Internal persistence input only. This interface does not verify native tokens,
