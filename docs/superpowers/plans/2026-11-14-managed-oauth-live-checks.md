@@ -35,11 +35,11 @@ Workspace: isolated `voice-invoice`, branch `codex/chatgpt-native-qualification`
 
 - [ ] Build and execute baseline tests on a selected available simulator/device; record actual test counts, not the permissive helper-script exit.
 - [x] Add development-only official Auth0 Swift SDK login and secure credential storage with tests;20 simulator tests passed, independently reviewed. No production enrollment.
-- [ ] Issue a separately authorized native-audience token and compare its verified opaque Apple identity privately with the hosted flow. No email matching or prefix stripping.
-- [ ] Verify actual native login on selected runtime, then independently review and document evidence.
+- [x] Issue a separately authorized native-audience token and compare its verified opaque Apple identity privately with the hosted flow. No email matching or prefix stripping.
+- [x] Verify actual native login on selected runtime, then independently review and document evidence; reviewed verifier/SDK artifacts and real signed comparison passed.
 
 ## Later implementation
 
 After provider gates pass, write concrete D1 account/subscription, records/sync/numbering, native outbox and MCP authoring plans against current code. Preserve one owner/business/subscription, StoreKit lineage uniqueness, entitlement rules, decimal-string USD calculations, revision/idempotency and atomic D1 batch gates. Every D1 concurrency guarantee requires real workerd/D1 tests. Keep finalization/PDF/email/text native; no payment or send tools. User authorizes full implementation, feature-branch pushes and development testing; production rollout remains excluded.
 
-Prepared native provider config and independently reviewed SDK artifact are complete; owner-assisted native login succeeded; private signed comparison remains pending. Native main-app baseline attempt failed before executing tests (inherited simulator architecture issue); the separate qualifier has20 actual passing tests.
+Prepared native provider config and independently reviewed SDK artifact are complete; owner-assisted native login succeeded; private signed comparison passed via focused identity-only retry after the initial600-second simulator-recovery timeout. Hosted lifecycle checks passed separately; temporary callback removed and one-use secret deleted. Native main-app baseline attempt failed before executing tests (inherited simulator architecture issue); the separate qualifier has20 actual passing tests.
