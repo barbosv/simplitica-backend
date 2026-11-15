@@ -8,12 +8,36 @@ export const CLOUD_AUDIENCE = "https://simpli-invoice-mcp-dev.simplitica.co/mcp"
 export const CLOUD_CLIENT_ID = "tpc_5RjUULWf1V9koMnfWj1Xg3";
 const appleIdentityClaim = "https://simplitica.co/apple_identity";
 const connectionEpochClaim = "https://simplitica.co/connection_epoch";
+const authorizationNamespaceClaim = "https://simplitica.co/authorization_namespace";
+
+export class CloudTokenConfigurationError extends Error {
+  readonly code = "invalid_configuration";
+  constructor() {
+    super("invalid_configuration");
+    this.name = "CloudTokenConfigurationError";
+  }
+}
+
+function isAuthorizationNamespace(value: unknown): value is string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(value)) return false;
+  try {
+    const decoded = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+    return decoded.length === 32 && btoa(decoded).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_") === value;
+  } catch {
+    return false;
+  }
+}
 
 // Internal dependencies only: callers cannot supply issuer/audience/JWKS URLs.
 // This isolated admission gate is not mounted on a public route.
-export function createCloudTokenAuthorizer(db: D1Database, dependencies?: { keys?: JWTVerifyGetKey; now?: () => number }) {
+export function createCloudTokenAuthorizer(db: D1Database, dependencies: { authorizationNamespace: string; keys?: JWTVerifyGetKey; now?: () => number }) {
+  // Trusted external configuration (future CLOUD_AUTHORIZATION_NAMESPACE),
+  // outside D1 so a restored/cloned revision cannot resurrect old credentials.
+  // Capture it once; never infer it from a token or persisted application state.
+  const authorizationNamespace = dependencies?.authorizationNamespace;
+  if (!isAuthorizationNamespace(authorizationNamespace)) throw new CloudTokenConfigurationError();
   const connections = createCloudConnectionRepository(db);
-  return async (token: string): Promise<(CloudOwner & { connectionEpoch: number }) | null> => {
+  return async (token: string): Promise<(CloudOwner & { connectionEpoch: number; authorizationNamespace: string }) | null> => {
     if (typeof token !== "string" || token.length === 0 || token.length > 12000) return null;
     const now = (dependencies?.now ?? Date.now)();
     if (!isNonnegativeSafeInteger(now)) return null;
@@ -34,7 +58,8 @@ export function createCloudTokenAuthorizer(db: D1Database, dependencies?: { keys
     }
     const appleIdentity = payload[appleIdentityClaim];
     const connectionEpoch = payload[connectionEpochClaim];
-    if (!isOpaqueIdentifier(payload.sub) || !isOpaqueIdentifier(appleIdentity) ||
+    if (payload[authorizationNamespaceClaim] !== authorizationNamespace ||
+        !isOpaqueIdentifier(payload.sub) || !isOpaqueIdentifier(appleIdentity) ||
         payload.azp !== CLOUD_CLIENT_ID || typeof payload.scope !== "string" || !payload.scope.split(" ").includes("cloud:access") ||
         !isNonnegativeSafeInteger(payload.iat) || payload.iat > Math.floor(now / 1000) ||
         !isNonnegativeSafeInteger(connectionEpoch) || connectionEpoch === 0) return null;
@@ -45,6 +70,6 @@ export function createCloudTokenAuthorizer(db: D1Database, dependencies?: { keys
       identity: { issuer: CLOUD_ISSUER, appleIdentity }, clientId: CLOUD_CLIENT_ID,
       tokenIssuedAt: payload.iat, connectionEpoch, now,
     });
-    return owner ? { ...owner, connectionEpoch } : null;
+    return owner ? { ...owner, connectionEpoch, authorizationNamespace } : null;
   };
 }

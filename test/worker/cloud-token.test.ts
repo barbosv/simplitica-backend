@@ -18,6 +18,10 @@ const audience = "https://simpli-invoice-mcp-dev.simplitica.co/mcp";
 const clientId = "tpc_5RjUULWf1V9koMnfWj1Xg3";
 const appleClaim = "https://simplitica.co/apple_identity";
 const epochClaim = "https://simplitica.co/connection_epoch";
+const namespaceClaim = "https://simplitica.co/authorization_namespace";
+// Synthetic, explicit out-of-D1 configuration, independent of token contents.
+const authorizationNamespace = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const restoredNamespace = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE";
 const now = 1_800_000_010_000;
 const identity = { issuer, appleIdentity: "apple|owner" };
 const command = () => ({ identity: { ...identity }, clientId, deviceKeyId: "device", now: now - 10_000, expectedRevision: 0 });
@@ -47,14 +51,14 @@ async function active(appleIdentity = identity.appleIdentity) {
     identity: context.identity, deviceKeyId: "device", purchase: { appSlug: "simpli-invoice", environment: "Sandbox", originalTransactionId: "lineage" },
   } });
   await createCloudConnectionRepository(env.DB).approve(context);
-  return { ownerId: enrolled.ownerId, businessId: enrolled.businessId, connectionEpoch: 1 };
+  return { ownerId: enrolled.ownerId, businessId: enrolled.businessId, connectionEpoch: 1, authorizationNamespace };
 }
 async function token(patch: JWTPayload = {}, signingKey = keys.privateKey, alg = "RS256", header: Record<string, unknown> = {}) {
   return new SignJWT({ iss: issuer, aud: audience, azp: clientId, sub: "auth0|subject", scope: "cloud:access",
-    iat: 1_800_000_001, exp: 1_800_000_100, [appleClaim]: identity.appleIdentity, [epochClaim]: 1, ...patch,
+    iat: 1_800_000_001, exp: 1_800_000_100, [appleClaim]: identity.appleIdentity, [epochClaim]: 1, [namespaceClaim]: authorizationNamespace, ...patch,
   }).setProtectedHeader({ alg, kid: "test-key", ...header }).sign(signingKey);
 }
-const authorize = (db = env.DB, clock = () => now, keys: JWTVerifyGetKey = resolveKey) => createCloudTokenAuthorizer(db, { keys, now: clock });
+const authorize = (db = env.DB, clock = () => now, keys: JWTVerifyGetKey = resolveKey) => createCloudTokenAuthorizer(db, { authorizationNamespace, keys, now: clock });
 
 it("accepts a real RS256 current signed epoch through real D1", async () => {
   const owner = await active();
@@ -90,7 +94,7 @@ it("denies another signed owner even with the active epoch", async () => {
 it("denies payload tampering and invalid signatures before D1", async () => {
   const signed = await token();
   const parts = signed.split(".");
-  parts[1] = btoa(JSON.stringify({ iss: issuer, aud: audience, azp: clientId, sub: "auth0|subject", scope: "cloud:access", iat: 1_800_000_001, exp: 1_800_000_100, [appleClaim]: identity.appleIdentity, [epochClaim]: 3 })).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  parts[1] = btoa(JSON.stringify({ iss: issuer, aud: audience, azp: clientId, sub: "auth0|subject", scope: "cloud:access", iat: 1_800_000_001, exp: 1_800_000_100, [appleClaim]: identity.appleIdentity, [epochClaim]: 3, [namespaceClaim]: authorizationNamespace })).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   expect(await authorize(null as never)(parts.join("."))).toBeNull();
   expect(await authorize(null as never)(await token({}, otherKeys.privateKey))).toBeNull();
 });
@@ -180,7 +184,7 @@ it("uses the fixed issuer JWKS anew per admission and ignores token jku", async 
     return Response.json(++calls === 1 ? jwks : rotated);
   });
   try {
-    const verify = createCloudTokenAuthorizer(env.DB, { now: () => now });
+    const verify = createCloudTokenAuthorizer(env.DB, { authorizationNamespace, now: () => now });
     expect(await verify(await token({}, keys.privateKey, "RS256", { jku: "https://untrusted.example/keys" }))).toEqual(owner);
     expect(await verify(await token({}, otherKeys.privateKey))).toEqual(owner);
     expect(await verify(await token())).toBeNull();
@@ -193,8 +197,52 @@ it("bounds the default JWKS network request to two seconds and sanitizes failure
   }));
   try {
     const started = Date.now();
-    expect(await createCloudTokenAuthorizer(null as never, { now: () => now })(await token())).toBeNull();
+    expect(await createCloudTokenAuthorizer(null as never, { authorizationNamespace, now: () => now })(await token())).toBeNull();
     expect(Date.now() - started).toBeGreaterThanOrEqual(1900);
     expect(Date.now() - started).toBeLessThan(3000);
   } finally { fetcher.mockRestore(); }
+});
+
+
+it("rejects a pre-restore namespace despite the same active D1 epoch and accepts fresh namespace authority", async () => {
+  const owner = await active();
+  const oldToken = await token();
+  expect(await authorize()(oldToken)).toMatchObject({ ownerId: owner.ownerId, businessId: owner.businessId, connectionEpoch: 1 });
+  const restored = createCloudTokenAuthorizer(env.DB, { authorizationNamespace: restoredNamespace, keys: resolveKey, now: () => now });
+  // The same D1 state models restoring/cloning a snapshot with revision 1.
+  expect(await createCloudConnectionRepository(env.DB).getActiveEpoch(command())).toBe(1);
+  expect(await restored(oldToken)).toBeNull();
+  expect(await restored(await token({ [namespaceClaim]: restoredNamespace }))).toEqual({ ...owner, authorizationNamespace: restoredNamespace });
+  expect(await restored(await token({ [namespaceClaim]: restoredNamespace, [epochClaim]: 2 }))).toBeNull();
+  expect(await createCloudConnectionRepository(env.DB).getActiveEpoch(command())).toBe(1);
+});
+
+const invalidNamespaces = [undefined, null, 42, true, {}, [], "", "private-config-detail", "A".repeat(42), "A".repeat(44), "A".repeat(42) + "B", "A".repeat(42) + "=", "A".repeat(42) + "+", "A".repeat(42) + "/", "A".repeat(42) + "\ufffd"];
+it.each(invalidNamespaces.map((value, index) => ({ value, index })))("rejects invalid trusted namespace configuration case $index before D1", ({ value }) => {
+  let failure: unknown;
+  try { createCloudTokenAuthorizer(null as never, { authorizationNamespace: value as string }); }
+  catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).toMatchObject({ code: "invalid_configuration", message: "invalid_configuration" });
+  expect(failure).not.toHaveProperty("cause");
+  expect(String(failure)).not.toContain("private-config-detail");
+});
+
+it.each([undefined, null, {}])("rejects omitted trusted namespace dependencies before D1 case %j", (dependencies) => {
+  expect(() => createCloudTokenAuthorizer(null as never, dependencies as never)).toThrow("invalid_configuration");
+});
+
+it.each([...invalidNamespaces, restoredNamespace].map((value, index) => ({ value, index })))("denies signed missing, malformed or mismatched namespace case $index before D1", async ({ value }) => {
+  expect(await authorize(null as never)(await token({ [namespaceClaim]: value }))).toBeNull();
+});
+
+it("rejects namespace tampering and a wrong signature before D1", async () => {
+  const parts = (await token()).split(".");
+  // Change only the payload's namespace; never re-sign the altered payload.
+  const claims = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+  claims[namespaceClaim] = restoredNamespace;
+  parts[1] = btoa(JSON.stringify(claims)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const restored = createCloudTokenAuthorizer(null as never, { authorizationNamespace: restoredNamespace, keys: resolveKey, now: () => now });
+  expect(await restored(parts.join("."))).toBeNull();
+  expect(await restored(await token({ [namespaceClaim]: restoredNamespace }, otherKeys.privateKey))).toBeNull();
 });
