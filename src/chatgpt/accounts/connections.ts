@@ -47,6 +47,9 @@ export function createCloudConnectionRepository(db: D1Database) {
     // Copy scalars before the first await, including identity fields.
     const { issuer, appleIdentity } = input.identity;
     const { deviceKeyId, clientId, now, expectedRevision } = input;
+    // Retain the legacy timestamp field for schema compatibility only. Signed
+    // epoch/namespace and active owned-device state establish token authority;
+    // this stored value must never impose an approval-time admission cutoff.
     const tokenNotBefore = Math.floor(now / 1000) + 1;
     const operationId = crypto.randomUUID();
     const revisionPredicate = status === "revoked"
@@ -140,7 +143,7 @@ export function createCloudConnectionRepository(db: D1Database) {
           !isNonnegativeSafeInteger(input?.connectionEpoch) || input.connectionEpoch === 0 ||
           input.tokenIssuedAt > Math.floor(input.now / 1000)) return null;
       const { issuer, appleIdentity } = input.identity;
-      const { clientId, tokenIssuedAt, connectionEpoch } = input;
+      const { clientId, connectionEpoch } = input;
       try {
         // One primary read checks both the connection and its approving device;
         // authorization is read-only and can never reactivate revoked state.
@@ -150,8 +153,8 @@ export function createCloudConnectionRepository(db: D1Database) {
            JOIN cloud_connections c ON c.owner_id = i.owner_id
            JOIN cloud_devices d ON d.owner_id = c.owner_id AND d.device_key_id = c.approving_device_key_id
            WHERE i.issuer = ? AND i.apple_identity = ? AND c.client_id = ?
-             AND c.status = 'active' AND d.status = 'active' AND c.revision = ? AND c.token_not_before <= ?`,
-          issuer, appleIdentity, clientId, connectionEpoch, tokenIssuedAt,
+             AND c.status = 'active' AND d.status = 'active' AND c.revision = ?`,
+          issuer, appleIdentity, clientId, connectionEpoch,
         ).first<CloudOwner>();
       } catch {
         throw new CloudConnectionError("storage_unavailable");

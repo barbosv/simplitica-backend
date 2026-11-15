@@ -5,6 +5,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT, type
 import { createCloudAccountRepository } from "../../src/chatgpt/accounts/d1.js";
 import { CloudConnectionError, createCloudConnectionRepository } from "../../src/chatgpt/accounts/connections.js";
 import { createCloudTokenAuthorizer } from "../../src/chatgpt/auth/cloud-token.js";
+import { createEpochHook } from "../../src/chatgpt/auth/epoch-hook.js";
 
 const env = workerEnv as {
   DB: D1Database;
@@ -42,11 +43,11 @@ beforeEach(async () => {
     await env.DB.prepare(`DELETE FROM ${table}`).run();
   }
 });
-async function active(appleIdentity = identity.appleIdentity) {
-  const context = { ...command(), identity: { issuer, appleIdentity } };
+async function active(appleIdentity = identity.appleIdentity, approvalNow = command().now) {
+  const context = { ...command(), now: approvalNow, identity: { issuer, appleIdentity } };
   const accounts = createCloudAccountRepository(env.DB);
   const challengeHash = "1".repeat(64);
-  await accounts.issueChallenge({ ...context, challengeHash, expiresAt: now + 1000 });
+  await accounts.issueChallenge({ ...context, challengeHash, expiresAt: context.now + 1000 });
   const enrolled = await accounts.commitEnrollment({ challengeHash, now: context.now, evidence: {
     identity: context.identity, deviceKeyId: "device", purchase: { appSlug: "simpli-invoice", environment: "Sandbox", originalTransactionId: "lineage" },
   } });
@@ -64,6 +65,36 @@ it("accepts a real RS256 current signed epoch through real D1", async () => {
   const owner = await active();
   expect(await authorize()(await token())).toEqual(owner);
   expect(await authorize()(await token({ scope: "openid cloud:access profile", aud: [audience, `${issuer}userinfo`] }))).toEqual(owner);
+});
+
+it.each([false, true])("admits same-second private-hook issuance repeatedly despite an elevated legacy fence: %j", async (elevatedFence) => {
+  const owner = await active(identity.appleIdentity, elevatedFence ? now + 60_100 : now + 100);
+  const repo = createCloudConnectionRepository(env.DB);
+  if (elevatedFence) {
+    await repo.revoke({ ...command(), expectedRevision: 1, now: now + 60_200 });
+    await repo.approve({ ...command(), expectedRevision: 2, now: now + 100 });
+  }
+  // Fresh initial authorization captures the hook's coherent pair after native
+  // approval. This lookup never supplies authority to any previously issued JWT.
+  const secret = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI";
+  const hook = createEpochHook(env.DB, secret, authorizationNamespace);
+  const response = await hook.request("https://simpli-invoice-native-dev.simplitica.co/api/internal/oauth/connection-epoch", {
+    method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ appleIdentity: identity.appleIdentity }),
+  });
+  expect(response.status).toBe(200);
+  const issued = await response.json() as { active: true; epoch: number; namespace: string };
+  expect(issued).toEqual({ active: true, epoch: elevatedFence ? 3 : 1, namespace: authorizationNamespace });
+  const bearer = await token({ iat: 1_800_000_010, [epochClaim]: issued.epoch, [namespaceClaim]: issued.namespace });
+  const expected = { ...owner, connectionEpoch: elevatedFence ? 3 : 1 };
+  // Approval .100, lookup/signing/admission .200: all protocol timestamps are
+  // within the same second. The exact bearer must remain usable afterward.
+  for (const admissionNow of [now + 200, now + 999, now + 1000, now + 89_999]) {
+    expect(await authorize(env.DB, () => admissionNow)(bearer)).toEqual(expected);
+  }
+  expect(await authorize(env.DB, () => now + 90_000)(bearer)).toBeNull();
+  await repo.revoke({ ...command(), expectedRevision: issued.epoch, now: now + 200 });
+  expect(await authorize(env.DB, () => now + 200)(bearer)).toBeNull();
 });
 
 const invalidClaims: [string, JWTPayload][] = [
@@ -123,7 +154,7 @@ it("never upgrades an old epoch after disconnect/reconnect despite delayed signi
   expect(await authorize()(await token({ iat: 1_800_000_009 }))).toBeNull();
   expect(await authorize()(await token({ [epochClaim]: undefined, iat: 1_800_000_009 }))).toBeNull();
   expect(await authorize()(await token({ [epochClaim]: 3, iat: 1_800_000_006 }))).toEqual({ ...owner, connectionEpoch: 3 });
-  expect(await authorize()(await token({ [epochClaim]: 3, iat: 1_800_000_005 }))).toBeNull();
+  expect(await authorize()(await token({ [epochClaim]: 3, iat: 1_800_000_005 }))).toEqual({ ...owner, connectionEpoch: 3 });
 });
 
 it("device revocation denies both issuer lookup and signed token admission", async () => {

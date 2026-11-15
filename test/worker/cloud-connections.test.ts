@@ -51,13 +51,14 @@ it("denies unknown identity and missing connection without creating authority", 
   expect(await snapshot()).toEqual(before);
 });
 
-it("requires subsequent token issuance and persists one owner/client approval across instances", async () => {
+it("admits same-second current epochs and persists one owner/client approval across instances", async () => {
   const owner = await enroll();
   await repo().approve(command());
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_000 })).toBeNull();
+  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_000, now })).toEqual(owner);
   expect(await repo().authorize(claims())).toEqual(owner);
   await repo().approve({ ...command(), expectedRevision: 1, now: now - 10_000 });
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_000 })).toBeNull();
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 2, tokenIssuedAt: 1_799_999_990, now: now - 10_000 })).toEqual(owner);
   const state = await snapshot();
   expect(state.cloud_connections).toHaveLength(1);
   expect(state.cloud_connections[0]).toMatchObject({ owner_id: owner.ownerId, client_id: "chatgpt", approving_device_key_id: "device", status: "active", token_not_before: 1_800_000_001 });
@@ -120,12 +121,13 @@ it("revokes idempotently and reconnects without reviving pre-disconnect tokens",
   expect((await snapshot()).cloud_connections[0]).toMatchObject({ revision: 4, token_not_before: 1_800_000_004 });
 });
 
-it("keeps the disconnect token fence even when a reconnect command has an older clock", async () => {
+it("denies old epochs while admitting the new epoch below a legacy fence after a backward-clock reconnect", async () => {
   const owner = await enroll();
   await repo().approve(command());
   await repo().revoke({ ...command(), expectedRevision: 1, now: now + 5000 });
   await repo().approve({ ...command(), expectedRevision: 2 });
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_005, now: now + 6000 })).toBeNull();
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 3, tokenIssuedAt: 1_800_000_000, now })).toEqual(owner);
   expect(await repo().authorize({ ...claims(), connectionEpoch: 3, tokenIssuedAt: 1_800_000_006, now: now + 6000 })).toEqual(owner);
 });
 
@@ -144,9 +146,9 @@ it.each([NaN, Infinity, -1, 0.5, Number.MAX_SAFE_INTEGER + 1])("fails closed on 
 });
 
 it.each([0, Number.MAX_SAFE_INTEGER])("accepts safe millisecond boundary %j while respecting whole seconds", async (time) => {
-  await enroll();
+  const owner = await enroll();
   await repo().approve({ ...command(), now: time });
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: time === 0 ? 0 : 9_007_199_254_740, now: time })).toBeNull();
+  expect(await repo().authorize({ ...claims(), tokenIssuedAt: time === 0 ? 0 : 9_007_199_254_740, now: time })).toEqual(owner);
   expect((await snapshot()).cloud_connections[0]).toMatchObject({ token_not_before: time === 0 ? 1 : 9_007_199_254_741 });
 });
 
@@ -183,7 +185,8 @@ it("concurrent same-generation approvals accept exactly one command", async () =
   const accepted = results.findIndex((result) => result.status === "fulfilled");
   const fence = [1_800_000_007, 1_800_000_002, 1_800_000_005, 1_800_000_001][accepted];
   expect(state.cloud_connections[0]).toMatchObject({ token_not_before: fence });
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: fence - 1, now: now + 7000 })).toBeNull();
+  expect(await repo().authorize({ ...claims(), tokenIssuedAt: fence - 1, now: now + 7000 })).toEqual(owner);
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 2, tokenIssuedAt: fence, now: now + 7000 })).toBeNull();
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: fence, now: now + 7000 })).toEqual(owner);
 });
 
