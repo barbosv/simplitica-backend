@@ -1,3 +1,4 @@
+import { validateAttestationContext } from "./context";
 import { verifyAttestationFacts } from "./facts";
 import { verifyAssertionFacts } from "./assertions";
 import type { AttestationContext, AttestationAdmissionPolicy, AssertionInput, AttestedDevice } from "./types";
@@ -13,11 +14,8 @@ import type { AttestationContext, AttestationAdmissionPolicy, AssertionInput, At
  * environment before verifying; assertion bytes contain no environment marker.
  */
 export function createAttestationAdmission(context: AttestationContext, policy: AttestationAdmissionPolicy) {
-  if (!context || typeof context.teamId !== "string" || !/^[A-Z0-9]{10}$/.test(context.teamId) ||
-      typeof context.bundleId !== "string" || context.bundleId.length > 255 ||
-      !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(context.bundleId) ||
-      (context.environment !== "development" && context.environment !== "production") ||
-      !policy || !Array.isArray(policy.validationCategories) || !policy.validationCategories.length ||
+  validateAttestationContext(context);
+  if (!policy || !Array.isArray(policy.validationCategories) || !policy.validationCategories.length ||
       !Array.isArray(policy.bundleVersions) || !policy.bundleVersions.length) {
     throw new Error("invalid_configuration");
   }

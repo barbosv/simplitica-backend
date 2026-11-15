@@ -1,3 +1,4 @@
+import { validateAttestationContext } from "./context";
 import { createPublicKey } from "node:crypto";
 import { verifyAssertion } from "node-app-attest";
 import { decodeStrictCbor } from "./cbor";
@@ -22,12 +23,7 @@ export async function verifyAssertionFacts(
   device: AttestedDevice,
   context: AttestationContext,
 ): Promise<AssertionFacts | null> {
-  if (!context || typeof context.teamId !== "string" || !/^[A-Z0-9]{10}$/.test(context.teamId) ||
-      typeof context.bundleId !== "string" || context.bundleId.length > 255 ||
-      !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(context.bundleId) ||
-      (context.environment !== "development" && context.environment !== "production")) {
-    throw new Error("invalid_configuration");
-  }
+  validateAttestationContext(context);
   try {
     if (!input || !(input.payload instanceof Uint8Array) || !input.payload.length || input.payload.length > MAX_BYTES ||
         !device || !Number.isInteger(device.counter) || device.counter < 0 || device.counter >= MAX_COUNTER ||

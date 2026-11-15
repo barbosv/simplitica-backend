@@ -1,3 +1,4 @@
+import { validateAttestationContext } from "./context";
 import { verifyAttestation } from "node-app-attest";
 import { decodeStrictCbor, decodeStrictCborItems } from "./cbor";
 import { assertCredentialPublicKey, validateAttestationCertificates } from "./certificates";
@@ -23,12 +24,7 @@ export async function verifyAttestationFacts(
   context: AttestationContext,
   dependencies: { now: () => number } = { now: Date.now },
 ): Promise<AttestationFacts | null> {
-  if (!context || typeof context.teamId !== "string" || !/^[A-Z0-9]{10}$/.test(context.teamId) ||
-      typeof context.bundleId !== "string" || context.bundleId.length > 255 ||
-      !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(context.bundleId) ||
-      (context.environment !== "development" && context.environment !== "production")) {
-    throw new Error("invalid_configuration");
-  }
+  validateAttestationContext(context);
   try {
     if (!input || !(input.attestation instanceof Uint8Array) ||
         !(input.clientPayload instanceof Uint8Array) || input.clientPayload.length === 0 ||
