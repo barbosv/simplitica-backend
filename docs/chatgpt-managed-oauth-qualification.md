@@ -27,6 +27,22 @@ An earlier standard first-party ChatGPT development client was superseded during
 
 Public metadata from both `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration` was read directly from the development tenant on November 14, 2026. It advertised S256 and plain, both client-secret methods, and global OIDC scopes including `offline_access`; it did not advertise `probe:read`. This verifies discovery reachability only. It does not establish the scopes the actual ChatGPT client will request or that any token flow succeeds. Never rewrite this discovery to hide a mismatch. Require actual S256 on the live authorization request.
 
+## Pending access-only cloud gate (November 15, 2026)
+
+The November 14 refresh results above and below are historical evidence for the synthetic probe. They do **not** qualify the selected cloud protocol. Keep Auth0 without Enterprise for the small family/friends audience. The source revision now targets MCP authorization-code-only sessions with a normal development lifetime target of 24 hours and a new sign-in after expiry. Native first-party refresh remains separate. Actual ChatGPT expiry, authentication-challenge and new-authorization behavior remain unqualified; cloud authoring stays blocked until those live checks pass.
+
+The new `src/chatgpt/auth/epoch-hook.ts` constructor is internal source only. No Worker entrypoint mounts it, and this task adds no public route, deployed binding, migration, Action publication or provider-setting change. It returns a coherent active D1 revision and externally configured namespace only when the exact trusted Apple owner, fixed issuer/client and active owned approving device match. The resource authorizer still takes its epoch and namespace exclusively from verified JWT claims.
+
+After source/configuration review, the separate development preparation is:
+
+1. Deliberately mount the read-only hook only in the reviewed development native API routing at `https://simpli-invoice-native-dev.simplitica.co/api/internal/oauth/connection-epoch`. Supply the same trusted external `CLOUD_AUTHORIZATION_NAMESPACE` used by cloud admission. It is canonical unpadded base64url for 32 random bytes, held outside D1 and captured by both constructors; never infer it from a token or restored database.
+2. Generate a separate canonical unpadded base64url 32-byte read-only lookup credential through a protected local secret flow. Enter it directly into the development backend's secret binding and the development Action secret named `CLOUD_CONNECTION_LOOKUP_TOKEN`. It is separate from the Auth0 client secret and the authorization namespace. Do not send values through chat, source, logs or provider-body exports. The current task does not request secret entry or prepare/deploy a binding.
+3. Publish/apply the exact reviewed Action source only to the development Post Login flow. Make only MCP client `tpc_5RjUULWf1V9koMnfWj1Xg3` authorization-code-only, disable offline access for its separate MCP API, and remove `offline_access` from the ChatGPT connection configuration. Add no Authorization Server scopes or metadata APIs. Keep native client/API grants, refresh and lifetime settings unchanged. Every legacy MCP refresh, missing protocol and unsupported protocol is independently denied by the Action regardless of scope fields.
+4. Initially qualify the existing synthetic `probe:read` authorization, which needs no hook lookup. For initial `cloud:access`, verify the real signed access token carries both `https://simplitica.co/connection_epoch` and `https://simplitica.co/authorization_namespace` from the same hook result. Never expose token/identity/namespace values in results. Hook errors, redirects, malformed/oversized results, missing secrets and two-second fetch/read expiry all deny issuance.
+5. Temporarily shorten only the development MCP API access-token lifetime; observe actual ChatGPT authorization, expiry, the OAuth challenge and a fresh interactive sign-in without a refresh token. Also verify disconnect, fresh native reapproval and new OAuth authorization: prior epochs stay denied by D1 immediately even before JWT expiry. Restore the ordinary 24-hour development target afterward. If ChatGPT cannot complete this supported access-only flow, keep cloud access disabled and investigate; no refresh fallback or paid dependency is authorized.
+
+Local workerd/D1 and exact-artifact real HTTP fixtures cover the implementation, including body/credential/namespace bounds and unconditional refresh denial. They do not prove Auth0 runtime compatibility or ChatGPT interoperation. Cold restore requires maintenance, draining in-flight issuance/admission, revoking restored connections/devices, rotating the external namespace everywhere, and fresh native/OAuth proofs as specified in [the connection-epoch design](superpowers/specs/2026-11-15-connection-epochs.md).
+
 ## Local configuration and checks
 
 Install dependencies with `npm ci`. Use the exact scripts in `package.json` for the dedicated probe:
@@ -69,14 +85,65 @@ The Worker requires the configured namespaced string claim in the verified API t
 
 Configure a Post Login Action **in the development tenant only**, scoped to the exact ChatGPT development client/MCP audience or the separate native development client/native audience. Auth0's trusted `event.connection` and `event.user.identities` supply the Apple connection and opaque provider identity. Do not derive it by stripping `apple|` from the Auth0 subject, and do not copy a value from user-editable metadata.
 
-The following Action was deployed as **Simpli Invoice Dev Apple Identity** and applied to the development Post Login flow on November 14, 2026. The dashboard confirmed all flow changes live. Built-in tests with synthetic events verified claim issuance for Apple, rejection of non-Apple login and wrong audience, and no-op behavior for another client. These are not real signed-token tests. The repository does not apply the Action automatically:
+The earlier identity-only Action was deployed as **Simpli Invoice Dev Apple Identity** on November 14, 2026. The following is the **pending, unpublished access-only source revision**, mirrored exactly from `scripts/auth0/development-apple-identity.cjs`. Local tests execute that exact artifact. It requires source/configuration review and the separate live gate above; the repository does not apply it automatically:
 
 ```js
-/* global exports, console */
+/* global exports, console, fetch, AbortController, Buffer, TextDecoder, setTimeout, clearTimeout */
 // Development tenant only. Never log request bodies, tokens, identities or query values.
+function canonical32(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value)
+    && Buffer.from(value, 'base64url').toString('base64url') === value;
+}
+
+async function cloudConnection(event, appleIdentity) {
+  const secret = event.secrets?.CLOUD_CONNECTION_LOOKUP_TOKEN;
+  if (!canonical32(secret)) throw new Error('unavailable');
+  const controller = new AbortController();
+  let timer, reader;
+  // The same deadline covers fetching headers and acquiring the entire body.
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => { controller.abort(); reject(new Error('unavailable')); }, 2000);
+  });
+  try {
+    const response = await Promise.race([fetch(
+      'https://simpli-invoice-native-dev.simplitica.co/api/internal/oauth/connection-epoch',
+      { method: 'POST', redirect: 'error', signal: controller.signal,
+        headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appleIdentity }) }
+    ), deadline]);
+    if (response.status !== 200 || Number(response.headers.get('Content-Length')) > 1024 || !response.body) throw new Error('unavailable');
+    reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      total += value.byteLength;
+      if (total > 1024) throw new Error('unavailable');
+      chunks.push(value);
+    }
+    const result = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, total)));
+    if (!result || Array.isArray(result) || Object.keys(result).length !== 3
+        || result.active !== true || !Number.isSafeInteger(result.epoch) || result.epoch <= 0
+        || !canonical32(result.namespace)) throw new Error('unavailable');
+    // Capture one coherent response; never separately refresh either scalar.
+    return { epoch: result.epoch, namespace: result.namespace };
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+    if (reader) { void reader.cancel().catch(() => {}); reader.releaseLock(); }
+  }
+}
+
 exports.onExecutePostLogin = async (event, api) => {
   const native = event.client.client_id === 'WXTblf8z8B9kGNaX9QgR6dUzexXT5Ixa';
   if (!native && event.client.client_id !== 'tpc_5RjUULWf1V9koMnfWj1Xg3') return;
+  // Access-only MCP: old refresh grants and ambiguous protocols cannot acquire
+  // a fresh connection epoch, even when their request omits every scope field.
+  if (!native && event.transaction?.protocol !== 'oidc-basic-profile') {
+    api.access.deny('Development MCP authorization-code flow required');
+    return;
+  }
   const resource = native ? 'https://simpli-invoice-native-dev.simplitica.co/api'
     : 'https://simpli-invoice-mcp-dev.simplitica.co/mcp';
   if (event.resource_server?.identifier !== resource) {
@@ -88,16 +155,26 @@ exports.onExecutePostLogin = async (event, api) => {
       && typeof identity.user_id === 'string'
       && identity.user_id.trim().length > 0
   );
-  if (event.connection.strategy !== 'apple' || identities.length !== 1) {
+  if (event.connection.strategy !== 'apple' || identities.length !== 1
+      || identities[0].user_id.length > 1024 || /[\uD800-\uDFFF]/u.test(identities[0].user_id)) {
     api.access.deny('A single verified Apple identity is required');
     return;
+  }
+  const query = event.request?.query ?? {};
+  const scopes = typeof query.scope === 'string' ? query.scope.split(/\s+/).filter(Boolean) : [];
+  const cloud = !native && (scopes.includes('cloud:access')
+    || (Array.isArray(event.transaction?.requested_scopes) && event.transaction.requested_scopes.includes('cloud:access')));
+  if (cloud) {
+    let connection;
+    try { connection = await cloudConnection(event, identities[0].user_id); }
+    catch { api.access.deny('Development cloud connection unavailable'); return; }
+    api.accessToken.setCustomClaim('https://simplitica.co/connection_epoch', connection.epoch);
+    api.accessToken.setCustomClaim('https://simplitica.co/authorization_namespace', connection.namespace);
   }
   const label = native ? 'development-native-qualification' : 'development-oauth-qualification';
   if (event.transaction?.protocol === 'oauth2-refresh-token') {
     console.log(JSON.stringify({ event: label, flow: 'refresh' }));
   } else {
-    const query = event.request?.query ?? {};
-    const scopes = typeof query.scope === 'string' ? query.scope.split(/\s+/).filter(Boolean) : [];
     const observation = {
       event: label, flow: 'authorization',
       pkceS256: query.code_challenge_method === 'S256'
@@ -111,7 +188,7 @@ exports.onExecutePostLogin = async (event, api) => {
     } else {
       console.log(JSON.stringify({ ...observation, resourceMatches: query.resource === resource,
         probeScope: scopes.includes('probe:read'), offlineAccess: scopes.includes('offline_access'),
-        unexpectedScopes: scopes.some(scope => scope !== 'probe:read' && scope !== 'offline_access'),
+        unexpectedScopes: scopes.some(scope => !['probe:read', 'cloud:access', 'offline_access'].includes(scope)),
       }));
     }
   }
@@ -121,7 +198,7 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 ```
 
-This is an issuer assertion, not independent proof that native and hosted flows identify the same Apple user. Validate the identity data shape in a real development login and refresh transaction; if the event lacks the required fields, deny and investigate rather than fall back to email or a guessed prefix. Review any future template change before publishing it to the development Login flow. For full continuity qualification, separately issue native-audience tokens with the equivalent trusted mapping and compare identifiers privately under the same approved Apple App ID/developer-team grouping. Do not expose those identities in MCP output.
+This is an issuer assertion, not independent proof that native and hosted flows identify the same Apple user. Validate the identity data shape in a real development initial MCP authorization and native login/refresh transaction; if the event lacks the required fields, deny and investigate rather than fall back to email or a guessed prefix. Review any future template change before publishing it to the development Login flow. For full continuity qualification, separately issue native-audience tokens with the equivalent trusted mapping and compare identifiers privately under the same approved Apple App ID/developer-team grouping. Do not expose those identities in MCP output.
 
 ## HTTPS staging or tunnel
 
@@ -139,7 +216,7 @@ For future deployment or tunnel changes:
 
 Register this server through the actual ChatGPT development app portal with OAuth and the predefined third-party Auth0 client. Copy the exact callback shown by that portal into the client's allowed callback list. Put the client secret only into the portal's secure OAuth field. Keep API-only identity settings off unless a separately reviewed qualification adjustment is required; native login can still use OIDC.
 
-Request only the explicit API permission plus `offline_access` when supported. Inspect the actual authorization request: `response_type=code`, PKCE `code_challenge_method=S256`, the correct client, callback, resource/audience and scope set. A provider's advertised scopes are not the client's requested scopes. If ChatGPT requests incompatible OIDC scopes, investigate the portal/client configuration and record a failed gate rather than rewriting provider discovery or widening the client silently. Historical package-level OIDC overrides may not apply to the current portal.
+For the pending access-only MCP gate, request only the explicit API permission and omit `offline_access`; retain native refresh settings. The refresh procedure and results recorded below describe the historical November 14 synthetic qualification. Inspect the actual authorization request: `response_type=code`, PKCE `code_challenge_method=S256`, the correct client, callback, resource/audience and scope set. A provider's advertised scopes are not the client's requested scopes. If ChatGPT requests incompatible OIDC scopes, investigate the portal/client configuration and record a failed gate rather than rewriting provider discovery or widening the client silently. Historical package-level OIDC overrides may not apply to the current portal.
 
 | Gate | Required real evidence | Current status |
 | --- | --- | --- |

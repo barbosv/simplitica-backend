@@ -41,11 +41,12 @@ it("reports an incompatible authorization request without rewriting provider met
     probeScope: true, offlineAccess: false, unexpectedScopes: true });
 });
 
-it("distinguishes refresh from authorization without logging refresh bodies", async () => {
+it("denies legacy MCP refresh without logging refresh bodies", async () => {
   const result = await execute({ transaction: { protocol: "oauth2-refresh-token" },
     request: { body: { refresh_token: "PRIVATE-TOKEN" } } });
-  expect(result.claims).toHaveLength(1);
-  expect(JSON.parse(result.logs[0]!)).toEqual({ event: "development-oauth-qualification", flow: "refresh" });
+  expect(result.claims).toEqual([]);
+  expect(result.denied).toEqual(["Development MCP authorization-code flow required"]);
+  expect(result.logs).toEqual([]);
   expect(result.logs.join()).not.toContain("PRIVATE");
 });
 
@@ -92,4 +93,32 @@ it.each([
   expect(result.denied).toHaveLength(1);
   expect(result.claims).toEqual([]);
   expect(result.logs).toEqual([]);
+});
+
+it("preserves first-party native refresh claim issuance", async () => {
+  const result = await execute({ ...nativeEvent, transaction: { protocol: "oauth2-refresh-token" }, request: { body: { refresh_token: "PRIVATE-TOKEN" } } });
+  expect(result.denied).toEqual([]);
+  expect(result.claims).toEqual([["https://simplitica.co/apple_identity", "PRIVATE-APPLE-ID"]]);
+  expect(JSON.parse(result.logs[0]!)).toEqual({ event: "development-native-qualification", flow: "refresh" });
+  expect(result.logs.join()).not.toContain("PRIVATE");
+});
+
+it.each([
+  ["oversize", "x".repeat(1025)], ["unpaired high surrogate", "\ud800"],
+  ["unpaired low surrogate", "\udfff"], ["embedded unpaired surrogate", "before\ud800after"],
+])("denies native malformed %s consistently on initial login and refresh", async (_name, user_id) => {
+  for (const protocol of ["oidc-basic-profile", "oauth2-refresh-token"]) {
+    const result = await execute({ ...nativeEvent, transaction: { protocol }, user: { identities: [{ provider: "apple", user_id }] } });
+    expect(result.denied).toEqual(["A single verified Apple identity is required"]);
+    expect(result.claims).toEqual([]);
+    expect(result.logs).toEqual([]);
+  }
+});
+
+it.each(["\ufffd", "😀", " apple|雪\u0000 ", "😀".repeat(512)])("preserves native opaque identity %j on initial login and refresh", async user_id => {
+  for (const protocol of ["oidc-basic-profile", "oauth2-refresh-token"]) {
+    const result = await execute({ ...nativeEvent, transaction: { protocol }, user: { identities: [{ provider: "apple", user_id }] } });
+    expect(result.denied).toEqual([]);
+    expect(result.claims).toEqual([["https://simplitica.co/apple_identity", user_id]]);
+  }
 });

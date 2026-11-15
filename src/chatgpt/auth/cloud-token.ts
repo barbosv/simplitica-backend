@@ -3,30 +3,11 @@ import { createCloudConnectionRepository } from "../accounts/connections.js";
 import type { CloudOwner } from "../accounts/types.js";
 import { isNonnegativeSafeInteger, isOpaqueIdentifier } from "../accounts/validation.js";
 
-export const CLOUD_ISSUER = "https://dev-i8usug5fp48kepvr.us.auth0.com/";
-export const CLOUD_AUDIENCE = "https://simpli-invoice-mcp-dev.simplitica.co/mcp";
-export const CLOUD_CLIENT_ID = "tpc_5RjUULWf1V9koMnfWj1Xg3";
+import { CLOUD_ISSUER, CLOUD_AUDIENCE, CLOUD_CLIENT_ID, CloudTokenConfigurationError, isCanonicalBase64url32 } from "./configuration.js";
+export { CLOUD_ISSUER, CLOUD_AUDIENCE, CLOUD_CLIENT_ID, CloudTokenConfigurationError } from "./configuration.js";
 const appleIdentityClaim = "https://simplitica.co/apple_identity";
 const connectionEpochClaim = "https://simplitica.co/connection_epoch";
 const authorizationNamespaceClaim = "https://simplitica.co/authorization_namespace";
-
-export class CloudTokenConfigurationError extends Error {
-  readonly code = "invalid_configuration";
-  constructor() {
-    super("invalid_configuration");
-    this.name = "CloudTokenConfigurationError";
-  }
-}
-
-function isAuthorizationNamespace(value: unknown): value is string {
-  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(value)) return false;
-  try {
-    const decoded = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
-    return decoded.length === 32 && btoa(decoded).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_") === value;
-  } catch {
-    return false;
-  }
-}
 
 // Internal dependencies only: callers cannot supply issuer/audience/JWKS URLs.
 // This isolated admission gate is not mounted on a public route.
@@ -35,7 +16,7 @@ export function createCloudTokenAuthorizer(db: D1Database, dependencies: { autho
   // outside D1 so a restored/cloned revision cannot resurrect old credentials.
   // Capture it once; never infer it from a token or persisted application state.
   const authorizationNamespace = dependencies?.authorizationNamespace;
-  if (!isAuthorizationNamespace(authorizationNamespace)) throw new CloudTokenConfigurationError();
+  if (!isCanonicalBase64url32(authorizationNamespace)) throw new CloudTokenConfigurationError();
   const connections = createCloudConnectionRepository(db);
   return async (token: string): Promise<(CloudOwner & { connectionEpoch: number; authorizationNamespace: string }) | null> => {
     if (typeof token !== "string" || token.length === 0 || token.length > 12000) return null;
