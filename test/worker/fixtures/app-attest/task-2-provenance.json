@@ -1,0 +1,26 @@
+{
+  "upstream": {
+    "source": "https://raw.githubusercontent.com/uebelack/node-app-attest/v2.2.0/test/verifyAssertion.test.js",
+    "tag": "v2.2.0",
+    "commit": "7f20c1cf577d0ffaff4ec71406e99c902f94f2bf",
+    "license": "MIT",
+    "sourceSha256": "0b81fd8ab7af840cede94dc2c3201782d7488da0a3ea4244b7a039228af4ed21",
+    "transformation": "Extracted unchanged assertion/publicKeyPem/exact UTF8 payload/teamId/bundleId constants into JSON; no Apple attestation pairing established."
+  },
+  "fixtureSha256": {
+    "assertion-upstream.json": "a5d12cf503c81ff203629be7cbdee0d0f683fc34f94d1743ab8fcc5fe8267ae8",
+    "payload-golden.json": "2bb10cc5501e80329104e35df4b3ff838e257b39b40e45f978b5cf86822b26a7",
+    "synthetic-assertions.ts": "7ab2cd2be20d9d2cc1f79f598e45116c2a451d4de970c5189dcd8d306512e484"
+  },
+  "classification": {
+    "assertion-upstream.json": "Public historical unpaired-key signature interoperability fixture; not Apple-root evidence",
+    "payload-golden.json": "Locally authored fixed synthetic bytes; not domain-command authority",
+    "synthetic-assertions.ts": "Runtime-generated synthetic ECDSA controls; private keys not persisted",
+    "candidateAssertionExtensions": "Provisional numeric UInt32 validationCategory + <=128 UTF8-byte text bundleVersion; exact encoding/flags need paired physical capture"
+  },
+  "primarySources": [
+    "https://developer.apple.com/documentation/devicecheck/validating-apps-that-connect-to-your-server.md",
+    "https://raw.githubusercontent.com/uebelack/node-app-attest/v2.2.0/src/verifyAssertion.js",
+    "https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/"
+  ]
+}
