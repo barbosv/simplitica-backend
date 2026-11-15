@@ -14,7 +14,7 @@ const env = workerEnv as {
 const now = 1_800_000_000_123;
 const identity = { issuer: "https://issuer.example/", appleIdentity: "apple|owner" };
 const command = () => ({ identity: { ...identity }, deviceKeyId: "device", clientId: "chatgpt", now, expectedRevision: 0 });
-const claims = () => ({ identity: { ...identity }, clientId: "chatgpt", tokenIssuedAt: 1_800_000_001, now: now + 1000 });
+const claims = () => ({ identity: { ...identity }, clientId: "chatgpt", connectionEpoch: 1, tokenIssuedAt: 1_800_000_001, now: now + 1000 });
 const repo = () => createCloudConnectionRepository(env.DB);
 const tables = ["cloud_connections", "cloud_enrollment_commits", "cloud_purchase_lineages", "cloud_devices", "cloud_businesses", "cloud_identities", "cloud_owners", "cloud_enrollment_challenges", "cloud_batch_guards"];
 async function snapshot() {
@@ -115,7 +115,7 @@ it("revokes idempotently and reconnects without reviving pre-disconnect tokens",
   expect(await repo().authorize({ ...claims(), now: now + 10_000 })).toBeNull();
   await repo().approve({ ...command(), expectedRevision: 2, now: now + 3000 });
   expect(await repo().authorize({ ...claims(), now: now + 10_000 })).toBeNull();
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_004, now: now + 4000 })).toEqual(owner);
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 3, tokenIssuedAt: 1_800_000_004, now: now + 4000 })).toEqual(owner);
   await repo().approve({ ...command(), expectedRevision: 3 });
   expect((await snapshot()).cloud_connections[0]).toMatchObject({ revision: 4, token_not_before: 1_800_000_004 });
 });
@@ -126,7 +126,7 @@ it("keeps the disconnect token fence even when a reconnect command has an older 
   await repo().revoke({ ...command(), expectedRevision: 1, now: now + 5000 });
   await repo().approve({ ...command(), expectedRevision: 2 });
   expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_005, now: now + 6000 })).toBeNull();
-  expect(await repo().authorize({ ...claims(), tokenIssuedAt: 1_800_000_006, now: now + 6000 })).toEqual(owner);
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 3, tokenIssuedAt: 1_800_000_006, now: now + 6000 })).toEqual(owner);
 });
 
 it.each([undefined, null, "1800000001", NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, 1_800_000_002])("denies malformed, missing or future iat %j", async (tokenIssuedAt) => {
@@ -214,6 +214,7 @@ it.each(fields.flatMap((field) => invalidIdentifiers.map((invalid, index) => ({ 
   await expectCode(unavailable.revoke(input), "invalid_input");
   if (field !== "deviceKeyId") {
     expect(await unavailable.authorize({ ...claims(), identity: input.identity, clientId: input.clientId })).toBeNull();
+    expect(await unavailable.getActiveEpoch({ identity: input.identity, clientId: input.clientId })).toBeNull();
     expect(await unavailable.getState({ identity: input.identity, clientId: input.clientId })).toBeNull();
   }
 });
@@ -226,6 +227,7 @@ it("denies malformed runtime context before touching D1", async () => {
     await expectCode(unavailable.revoke(value as ReturnType<typeof command>), "invalid_input");
     expect(await unavailable.authorize(value as ReturnType<typeof claims>)).toBeNull();
     expect(await unavailable.getState(value as ReturnType<typeof command>)).toBeNull();
+    expect(await unavailable.getActiveEpoch(value as ReturnType<typeof command>)).toBeNull();
   }
 });
 
@@ -301,6 +303,7 @@ it("sanitizes real D1 mutation and authorization failures", async () => {
     await expectCode(repo().revoke(command()), "storage_unavailable");
     await expectCode(repo().authorize(claims()), "storage_unavailable");
     await expectCode(repo().getState(command()), "storage_unavailable");
+    await expectCode(repo().getActiveEpoch(command()), "storage_unavailable");
   } finally {
     await env.DB.prepare("ALTER TABLE unavailable_connections RENAME TO cloud_connections").run();
   }
@@ -313,6 +316,7 @@ it("sanitizes failed authority re-reads after a mutation batch failure", async (
     await expectCode(repo().revoke(command()), "storage_unavailable");
     await expectCode(repo().authorize(claims()), "storage_unavailable");
     await expectCode(repo().getState(command()), "storage_unavailable");
+    await expectCode(repo().getActiveEpoch(command()), "storage_unavailable");
   } finally {
     await env.DB.prepare("ALTER TABLE unavailable_identities RENAME TO cloud_identities").run();
   }
@@ -348,7 +352,7 @@ it("never authorizes a token issued while disconnected through a stale approval"
   expect(await repo().authorize(disconnectedToken)).toBeNull();
   await repo().approve({ ...command(), expectedRevision: 2, now: now + 6000 });
   expect(await repo().authorize(disconnectedToken)).toBeNull();
-  expect(await repo().authorize({ ...disconnectedToken, tokenIssuedAt: 1_800_000_007 })).not.toBeNull();
+  expect(await repo().authorize({ ...disconnectedToken, connectionEpoch: 3, tokenIssuedAt: 1_800_000_007 })).not.toBeNull();
 });
 
 
@@ -468,4 +472,50 @@ it.each([0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1])("D1 rejects invalid persisted
   const before = await snapshot();
   await expect(env.DB.prepare("UPDATE cloud_connections SET revision = ?").bind(revision).run()).rejects.toThrow();
   expect(await snapshot()).toEqual(before);
+});
+
+
+it.each([undefined, null, "1", true, {}, NaN, Infinity, -1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1])("denies missing or malformed signed epoch %j before D1", async (connectionEpoch) => {
+  const unavailable = createCloudConnectionRepository(undefined as never);
+  expect(await unavailable.authorize({ ...claims(), connectionEpoch: connectionEpoch as number })).toBeNull();
+});
+
+it("denies omitted signed epoch even with a recent iat on an active connection", async () => {
+  await enroll();
+  await repo().approve(command());
+  const { connectionEpoch: omitted, ...unsigned } = claims();
+  expect(omitted).toBe(1);
+  expect(await repo().authorize(unsigned as ReturnType<typeof claims>)).toBeNull();
+});
+
+it("cannot upgrade disconnected or delayed old issuance through a new iat or backward reconnect clock", async () => {
+  const owner = await enroll();
+  await repo().approve(command());
+  const delayedOldGrant = { ...claims(), tokenIssuedAt: 1_800_000_020, now: now + 20_000 };
+  await repo().revoke({ ...command(), expectedRevision: 1, now: now + 5000 });
+  const disconnectedToken = { ...claims(), connectionEpoch: 2, tokenIssuedAt: 1_800_000_010, now: now + 20_000 };
+  expect(await repo().authorize(disconnectedToken)).toBeNull();
+  await repo().approve({ ...command(), expectedRevision: 2, now: now - 10_000 });
+  expect(await repo().authorize(delayedOldGrant)).toBeNull();
+  expect(await repo().authorize(disconnectedToken)).toBeNull();
+  expect(await repo().authorize({ ...claims(), connectionEpoch: 3, tokenIssuedAt: 1_800_000_006, now: now + 6000 })).toEqual(owner);
+});
+
+it("looks up only an active epoch for the exact identity/client and owned active device", async () => {
+  expect(await repo().getActiveEpoch(command())).toBeNull();
+  await enroll();
+  expect(await repo().getActiveEpoch(command())).toBeNull();
+  await repo().approve(command());
+  const before = await snapshot();
+  expect(await repo().getActiveEpoch(command())).toBe(1);
+  expect(await repo().getActiveEpoch({ ...command(), clientId: "other" })).toBeNull();
+  expect(await repo().getActiveEpoch({ ...command(), identity: { ...identity, appleIdentity: "other" } })).toBeNull();
+  expect(await repo().getActiveEpoch({ ...command(), identity: { ...identity, issuer: "https://ISSUER.example/" } })).toBeNull();
+  expect(await snapshot()).toEqual(before);
+  await repo().revoke({ ...command(), expectedRevision: 1 });
+  expect(await repo().getActiveEpoch(command())).toBeNull();
+  await repo().approve({ ...command(), expectedRevision: 2 });
+  expect(await repo().getActiveEpoch(command())).toBe(3);
+  await env.DB.prepare("UPDATE cloud_devices SET status = 'revoked' WHERE device_key_id = 'device'").run();
+  expect(await repo().getActiveEpoch(command())).toBeNull();
 });

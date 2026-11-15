@@ -10,12 +10,12 @@ export class CloudConnectionError extends Error {
 }
 
 // Internal inputs only: a future native command verifier supplies the device
-// context, and a managed-token verifier supplies identity/client/iat claims.
+// context, and a managed-token verifier supplies identity/client/iat/epoch claims.
 // These methods neither verify proofs nor fabricate token issuance timestamps.
 export type CloudConnectionState = { revision: number; status: "unapproved" | "active" | "revoked" };
 type Context = { identity: CloudIdentity; clientId: string };
 type Command = Context & { deviceKeyId: string; now: number; expectedRevision: number };
-type Claims = { identity: CloudIdentity; clientId: string; tokenIssuedAt: number; now: number };
+type Claims = { identity: CloudIdentity; clientId: string; tokenIssuedAt: number; connectionEpoch: number; now: number };
 function validIdentity(input: Context): boolean {
   return isOpaqueIdentifier(input?.identity?.issuer) &&
     isOpaqueIdentifier(input?.identity?.appleIdentity) &&
@@ -113,13 +113,34 @@ export function createCloudConnectionRepository(db: D1Database) {
         throw new CloudConnectionError("storage_unavailable");
       }
     },
+    // Trusted issuer state lookup only. Resource admission must instead compare
+    // the epoch already authenticated in the signed token via authorize().
+    async getActiveEpoch(input: Context): Promise<number | null> {
+      if (!validIdentity(input)) return null;
+      const { issuer, appleIdentity } = input.identity;
+      const { clientId } = input;
+      try {
+        const row = await statement(
+          `SELECT c.revision FROM cloud_identities i
+           JOIN cloud_connections c ON c.owner_id = i.owner_id
+           JOIN cloud_devices d ON d.owner_id = c.owner_id AND d.device_key_id = c.approving_device_key_id
+           WHERE i.issuer = ? AND i.apple_identity = ? AND c.client_id = ?
+             AND c.status = 'active' AND d.status = 'active'`,
+          issuer, appleIdentity, clientId,
+        ).first<{ revision: number }>();
+        return row?.revision ?? null;
+      } catch {
+        throw new CloudConnectionError("storage_unavailable");
+      }
+    },
     approve: (input: Command): Promise<void> => change(input, "active"),
     revoke: (input: Command): Promise<void> => change(input, "revoked"),
     async authorize(input: Claims): Promise<CloudOwner | null> {
       if (!validContext(input) || !isNonnegativeSafeInteger(input?.tokenIssuedAt) ||
+          !isNonnegativeSafeInteger(input?.connectionEpoch) || input.connectionEpoch === 0 ||
           input.tokenIssuedAt > Math.floor(input.now / 1000)) return null;
       const { issuer, appleIdentity } = input.identity;
-      const { clientId, tokenIssuedAt } = input;
+      const { clientId, tokenIssuedAt, connectionEpoch } = input;
       try {
         // One primary read checks both the connection and its approving device;
         // authorization is read-only and can never reactivate revoked state.
@@ -129,8 +150,8 @@ export function createCloudConnectionRepository(db: D1Database) {
            JOIN cloud_connections c ON c.owner_id = i.owner_id
            JOIN cloud_devices d ON d.owner_id = c.owner_id AND d.device_key_id = c.approving_device_key_id
            WHERE i.issuer = ? AND i.apple_identity = ? AND c.client_id = ?
-             AND c.status = 'active' AND d.status = 'active' AND c.token_not_before <= ?`,
-          issuer, appleIdentity, clientId, tokenIssuedAt,
+             AND c.status = 'active' AND d.status = 'active' AND c.revision = ? AND c.token_not_before <= ?`,
+          issuer, appleIdentity, clientId, connectionEpoch, tokenIssuedAt,
         ).first<CloudOwner>();
       } catch {
         throw new CloudConnectionError("storage_unavailable");
