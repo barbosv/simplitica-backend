@@ -20,7 +20,8 @@
     "db:migrate:production": "node scripts/prepare-worker-config.mjs production .wrangler/deploy-production.json && wrangler d1 migrations apply DB --remote --config .wrangler/deploy-production.json",
     "dev:qualify": "wrangler dev --config wrangler.qualify.jsonc --ip 127.0.0.1 --infer-origin-from-routes=false",
     "build:qualify": "tsc -p tsconfig.worker.json --noEmit && wrangler deploy --config wrangler.qualify.jsonc --dry-run --outdir dist-worker/qualify",
-    "qualify:oauth": "tsx scripts/qualification/run-managed-oauth.ts"
+    "qualify:oauth": "tsx scripts/qualification/run-managed-oauth.ts",
+    "qualify:identity": "tsx scripts/qualification/run-identity-qualification.ts"
   },
   "repository": {
     "type": "git",
