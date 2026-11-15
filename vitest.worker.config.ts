@@ -19,6 +19,7 @@ export default defineConfig({
         d1Databases: ["DB"],
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations("./migrations/d1"),
+          TEST_CLOUD_MIGRATIONS: await readD1Migrations("./migrations/chatgpt-d1"),
         },
         compatibilityDate: "2026-11-09",
         compatibilityFlags: ["nodejs_compat"],
