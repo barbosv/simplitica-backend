@@ -33,7 +33,7 @@
 
 **Interfaces:**
 - `AttestationContext = { teamId:string; bundleId:string; environment:"development"|"production" }`, trusted constructor configuration, not a request override.
-- `verifyAttestationFacts(input:{attestation:Uint8Array; keyId:string; clientDataHash:Uint8Array}, context:AttestationContext, dependencies?:{now:()=>number}):Promise<AttestationFacts|null>` in `facts.ts`. Time injection is internal test dependency only. Invalid trusted configuration throws fixed `invalid_configuration`; untrusted proof/parser/library failures return null.
+- `verifyAttestationFacts(input:{attestation:Uint8Array; keyId:string; clientPayload:Uint8Array}, context:AttestationContext, dependencies?:{now:()=>number}):Promise<AttestationFacts|null>` in `facts.ts`. The exact clientPayload bytes are bounded to 8192 before parsing and passed unchanged to upstream challenge; upstream computes SHA256 internally. Do not supply a precomputed hash or patch the hashing implementation. Time injection is internal test dependency only. Invalid trusted configuration throws fixed `invalid_configuration`; untrusted proof/parser/library failures return null.
 - `AttestationFacts` contains verified keyId, SPKI PEM public key, exact environment/AAGUID, counter, and parsed authenticator extensions. It is internal cryptographic evidence, explicitly insufficient for enrollment. Do not export it through a public Worker route or package barrel.
 - `decodeStrictCbor(bytes:Uint8Array, maxBytes:number):unknown` in `cbor.ts` performs the shared bounded decoding; consumed-length and embedded-object handling must reject trailing bytes. Keep byte strings as bytes and maps as Maps; do not coerce arbitrary keys to object properties.
 
