@@ -1,3 +1,4 @@
+import { CLOUD_AUDIENCE } from "../auth/configuration.js";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { requireRecordAuthority, type CloudRecordAuthority } from "../records/authority.js";
@@ -18,7 +19,23 @@ const search=z.strictObject({query:str,limit:z.number().int().min(1).max(100),af
 const id=z.strictObject({id:str});
 const preview=z.strictObject({businessRevision:rev,customerId:str,customerRevision:rev,input});
 const errorCodes: readonly RecordErrorCode[]=["invalid_input","not_authorized","not_ready","entitlement_required","revision_conflict","operation_conflict","not_found","resync_required","storage_unavailable","invalid_configuration","number_collision","numbering_exhausted"];
-const failure=(code:RecordErrorCode)=>({isError:true,content:[{type:"text" as const,text:`Error: ${code}`}],structuredContent:{ok:false,error:{code}}});
+const descriptions: Record<string,string> = {
+  get_business_context:"Read the current business profile and its local date.",
+  search_customers:"Search owned customers using a bounded page.",
+  get_customer:"Read an owned customer by ID.",
+  create_customer:"Persist a new customer using an operation key.",
+  search_saved_rates:"Search owned saved rates using a bounded page.",
+  get_pricing_guidance:"Get advisory pricing options from limited owned data; market guidance is unavailable.",
+  preview_document:"Calculate an unsaved draft preview without allocating a number.",
+  create_document:"Persist a numbered draft requiring native review.",
+  get_document:"Read an owned document by ID.",
+  update_document:"Persist changes to a draft requiring native review.",
+  convert_estimate_to_invoice:"Persist an invoice draft from an estimate requiring native review.",
+  open_in_app:"Return a link for native review; this does not launch the app.",
+};
+const resource = new URL(CLOUD_AUDIENCE);
+const challenge = `Bearer resource_metadata="${resource.origin}/.well-known/oauth-protected-resource${resource.pathname}", scope="cloud:access"`;
+const failure=(code:RecordErrorCode)=>({...(code === "not_authorized" ? {_meta:{"mcp/www_authenticate":[challenge]}} : {}),isError:true,content:[{type:"text" as const,text:`Error: ${code}`}],structuredContent:{ok:false,error:{code}}});
 export function createCloudToolServer(db:D1Database, dependencies:{authorizationNamespace:string;now?:()=>number}, authority:CloudRecordAuthority) {
   requireRecordAuthority(authority,dependencies.authorizationNamespace);
   const records=createCloudRecordRepository(db,dependencies), docs=createCloudDocumentRepository(db,dependencies), previews=createDocumentPreviewService(db,dependencies), pricing=createPricingGuidanceService(db,dependencies);
@@ -27,7 +44,7 @@ export function createCloudToolServer(db:D1Database, dependencies:{authorization
   function add<S extends z.ZodType>(name:string, schema:S, readOnly:boolean, run:(args:z.output<S>)=>Promise<unknown>) {
     const execute=run as (args:never)=>Promise<unknown>;
     registry.set(name,{schema,run:execute});
-    server.registerTool(name,{description:name.replaceAll("_"," "),inputSchema:schema as z.ZodType,annotations:{readOnlyHint:readOnly,destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{securitySchemes:[{type:"oauth2",scopes:["cloud:access"]}]}},async args=>respond(()=>run(args as z.output<S>)));
+    server.registerTool(name,{description:descriptions[name],inputSchema:schema as z.ZodType,annotations:{readOnlyHint:readOnly,destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{securitySchemes:[{type:"oauth2",scopes:["cloud:access"]}]}},async args=>respond(()=>run(args as z.output<S>)));
   }
   async function respond(action:()=>Promise<unknown>) {
     try {

@@ -14,7 +14,10 @@ async function rpc(server: ReturnType<typeof createCloudToolServer>, method:stri
 it("lists twelve strict OAuth tools and sanitizes invalid calls",async()=>{
  const {authority}=await setup(); const server=createCloudToolServer(env.DB,deps,authority);
  const list=await rpc(server,"tools/list"); expect(list.result.tools).toHaveLength(12);
- for(const tool of list.result.tools) expect(tool).toMatchObject({inputSchema:{type:"object",additionalProperties:false},_meta:{securitySchemes:[{type:"oauth2",scopes:["cloud:access"]}]}});
+ expect(list.result.tools.find((tool:{name:string})=>tool.name==="preview_document").description).toMatch(/unsaved.*number/i);
+ expect(list.result.tools.find((tool:{name:string})=>tool.name==="open_in_app").description).toMatch(/link.*does not launch/i);
+ const writes=new Set(["create_customer","create_document","update_document","convert_estimate_to_invoice"]);
+ for(const tool of list.result.tools) expect(tool).toMatchObject({inputSchema:{type:"object",additionalProperties:false},annotations:{readOnlyHint:!writes.has(tool.name),destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{securitySchemes:[{type:"oauth2",scopes:["cloud:access"]}]}});
  for(const params of [{name:"secret-tool",arguments:{}},{name:"get_business_context",arguments:{"secret-key":1}},{name:"get_pricing_guidance",arguments:{query:"x",unit:"secret-enum",kind:"labor",limit:1}}]) {
   const result=await rpc(server,"tools/call",params); expect(result.result).toMatchObject({isError:true,structuredContent:{ok:false,error:{code:"invalid_input"}}}); expect(JSON.stringify(result)).not.toContain("secret-");
  }
@@ -51,10 +54,12 @@ it("preserves document revisions, receipts, ownership and paid checks",async()=>
  expect(invoice).toMatchObject({value:{documentType:"invoice",requiresNativeReview:true,convertedFrom:{id:created.id,revision:2}}});
  await env.DB.prepare("UPDATE cloud_entitlements SET state='lapsed' WHERE owner_id=?").bind(f.owner.ownerId).run();
  expect(await call("get_document",{id:invoice.id})).toMatchObject({ok:true});
- expect(await call("preview_document",base)).toMatchObject({ok:false,error:{code:"entitlement_required"}});
+ const lapsed=await rpc(server,"tools/call",{name:"preview_document",arguments:base});
+ expect(lapsed.result).toMatchObject({structuredContent:{ok:false,error:{code:"entitlement_required"}}}); expect(lapsed.result._meta).toBeUndefined();
  expect(await call("get_business_context",{})).toMatchObject({ok:true});
  await env.DB.prepare("UPDATE cloud_devices SET status='revoked' WHERE owner_id=?").bind(f.owner.ownerId).run();
- expect(await call("get_document",{id:invoice.id})).toMatchObject({ok:false,error:{code:"not_authorized"}});
+ const revoked=await rpc(server,"tools/call",{name:"get_document",arguments:{id:invoice.id}});
+ expect(revoked.result).toMatchObject({structuredContent:{ok:false,error:{code:"not_authorized"}},_meta:{"mcp/www_authenticate":['Bearer resource_metadata="https://simpli-invoice-mcp-dev.simplitica.co/.well-known/oauth-protected-resource/mcp", scope="cloud:access"']}});
 });
 it("rejects nested overrides and prevents forged authority before DB access",async()=>{
  const {authority}=await setup(); const server=createCloudToolServer(env.DB,deps,authority);
@@ -74,4 +79,26 @@ it("returns fixed errors for invalid controls, storage failures and oversized re
  const large=await rpc(server,"tools/call",{name:"search_customers",arguments:{query:"",limit:10}});
  expect(large.result).toMatchObject({isError:true,structuredContent:{ok:false,error:{code:"storage_unavailable"}}});
  expect(new TextEncoder().encode(JSON.stringify(large.result)).length).toBeLessThanOrEqual(1024*1024+4096);
+});
+it("commits and replays a large valid document without exceeding the tool envelope",async()=>{
+ const f=await setup(), records=createCloudRecordRepository(env.DB,deps);
+ await records.putBusinessProfile(f.authority,{operationKey:"boundary-business",expectedRevision:0,value:{businessName:"B".repeat(256),addressLines:Array(10).fill("A".repeat(1024)),tax:{enabled:false,ratePercent:"0",label:"T"},timezone:"UTC",paymentTermsSummary:"P".repeat(2048)}});
+ const customerId="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+ await records.createCustomer(f.authority,{operationKey:"boundary-customer",expectedRevision:0,id:customerId,value:{name:"C".repeat(256),billingAddressLines:Array(10).fill("A".repeat(1024)),savedJobSites:Array.from({length:20},(_,i)=>({id:`${i.toString(16).padStart(8,"0")}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`,addressKind:"jobSite",displayAddress:"S".repeat(1024),recipientName:"R".repeat(256)}))}});
+ await env.DB.prepare("INSERT INTO cloud_number_state VALUES (?,1,1,'N-',3,1)").bind(f.owner.ownerId).run();
+ const server=createCloudToolServer(env.DB,deps,f.authority);
+ const args={operationKey:"boundary-create",businessRevision:1,customerId,customerRevision:1,input:{documentType:"invoice",issueDate:"2024-02-29",serviceDate:null,dueDate:null,title:"I".repeat(256),notes:"N".repeat(2048),paymentTermsSummary:"P".repeat(2048),jobSiteId:null,lines:Array.from({length:200},()=>({title:"L".repeat(256),detail:"D".repeat(2048),quantity:"1",unitPrice:"1",unit:"hour",kind:"labor",reportedProvenance:{kind:"explicit",reference:'"'.repeat(370)+"R".repeat(1678),asOf:null}})),discountAmount:"0"}};
+ const invoke=async()=> (await rpc(server,"tools/call",{name:"create_document",arguments:args})).result;
+ const created=await invoke();
+ expect(created).toMatchObject({structuredContent:{ok:true,data:{revision:1,value:{requiresNativeReview:true}}}});
+ const bytes=new TextEncoder().encode(JSON.stringify(created)).length;
+ expect(bytes).toBeGreaterThan(1_047_000);
+ expect(bytes).toBeLessThanOrEqual(1024*1024+4096);
+ expect(await invoke()).toEqual(created);
+ expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM cloud_mutation_receipts WHERE owner_id=? AND operation_key=?").bind(f.owner.ownerId,"boundary-create").first("n")).toBe(1);
+ const receiptBytes=await env.DB.prepare("SELECT length(CAST(response_snapshot AS BLOB)) AS n FROM cloud_mutation_receipts WHERE owner_id=? AND operation_key=?").bind(f.owner.ownerId,"boundary-create").first<number>("n");
+ expect(receiptBytes).toBeGreaterThan(1_047_000);
+ expect(receiptBytes).toBeLessThanOrEqual(1024*1024);
+ expect(bytes).toBeLessThanOrEqual(receiptBytes!+4096);
+ console.info("Large document boundary bytes",{receipt:receiptBytes,toolResult:bytes});
 });
