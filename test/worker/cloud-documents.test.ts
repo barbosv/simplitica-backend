@@ -169,3 +169,59 @@ it("rejects incrementing a maximum document revision", async () => {
   await env.DB.prepare("UPDATE cloud_documents SET revision=? WHERE owner_id=? AND id=?").bind(Number.MAX_SAFE_INTEGER,f.owner.ownerId,created.id).run();
   await expect(f.repo.updateDocument(f.authority,{operationKey:"max-update",id:created.id,expectedRevision:Number.MAX_SAFE_INTEGER,patch:{title:"changed"}})).rejects.toMatchObject({code:"invalid_input"});
 });
+
+const raceTables = ["cloud_customers", "cloud_documents", "cloud_number_state", "cloud_issued_numbers", "cloud_estimate_conversions", "cloud_mutation_receipts", "cloud_record_feed", "cloud_record_state", "cloud_batch_guards"];
+async function raceSnapshot() {
+  return Promise.all(raceTables.map(async table => (await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
+}
+it.each(["revision", "deletion"])("guards a customer selection against %s after planning", async mutation => {
+  const f = await fixture(), selectedId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  await f.records.createCustomer(f.authority, { operationKey: "selected", expectedRevision: 0, id: selectedId, value: { ...customer, name: "Selected" } });
+  const draft = await f.repo.createDocument(f.authority, request("draft"));
+  const before = await raceSnapshot();
+  let attempts = 0;
+  let afterMutation: Awaited<ReturnType<typeof raceSnapshot>> | undefined;
+  const db = new Proxy(env.DB, { get(target, key) {
+    if (key === "batch") return async (statements: D1PreparedStatement[]) => {
+      attempts++;
+      await target.prepare(mutation === "revision" ? "UPDATE cloud_customers SET revision=revision+1 WHERE owner_id=? AND id=?" : "UPDATE cloud_customers SET deleted_at=? WHERE owner_id=? AND id=?")
+        .bind(...(mutation === "revision" ? [f.owner.ownerId, selectedId] : [start, f.owner.ownerId, selectedId])).run();
+      afterMutation = await raceSnapshot();
+      return target.batch(statements);
+    };
+    const value = Reflect.get(target, key, target); return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const repo = createCloudDocumentRepository(db, { authorizationNamespace: namespace, now: () => start });
+  await expect(repo.updateDocument(f.authority, { operationKey: "race-update", id: draft.id, expectedRevision: 1, patch: { customerSelection: { id: selectedId, expectedRevision: 1 } } })).rejects.toMatchObject({ code: "revision_conflict" });
+  expect(attempts).toBe(1);
+  expect(afterMutation).toBeDefined();
+  expect(afterMutation![0]).not.toEqual(before[0]);
+  expect(afterMutation!.slice(1)).toEqual(before.slice(1));
+  expect(await raceSnapshot()).toEqual(afterMutation);
+  expect(await env.DB.prepare("SELECT revision,deleted_at FROM cloud_customers WHERE owner_id=? AND id=?").bind(f.owner.ownerId, selectedId).first()).toMatchObject(mutation === "revision" ? { revision: 2, deleted_at: null } : { revision: 1, deleted_at: start });
+});
+it.each(["revision", "deletion"])("guards estimate conversion against %s after planning", async mutation => {
+  const f = await fixture(), estimate = await f.repo.createDocument(f.authority, request("estimate", "estimate"));
+  const before = await raceSnapshot();
+  let attempts = 0;
+  let afterMutation: Awaited<ReturnType<typeof raceSnapshot>> | undefined;
+  const db = new Proxy(env.DB, { get(target, key) {
+    if (key === "batch") return async (statements: D1PreparedStatement[]) => {
+      attempts++;
+      await target.prepare(mutation === "revision" ? "UPDATE cloud_documents SET revision=revision+1 WHERE owner_id=? AND id=?" : "UPDATE cloud_documents SET deleted_at=? WHERE owner_id=? AND id=?")
+        .bind(...(mutation === "revision" ? [f.owner.ownerId, estimate.id] : [start, f.owner.ownerId, estimate.id])).run();
+      afterMutation = await raceSnapshot();
+      return target.batch(statements);
+    };
+    const value = Reflect.get(target, key, target); return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const repo = createCloudDocumentRepository(db, { authorizationNamespace: namespace, now: () => start });
+  await expect(repo.convertEstimateToInvoice(f.authority, { operationKey: "race-convert", id: estimate.id, expectedRevision: 1, issueDate: "2024-03-01", dueDate: null })).rejects.toMatchObject({ code: mutation === "revision" ? "revision_conflict" : "not_found" });
+  expect(attempts).toBe(1);
+  expect(afterMutation).toBeDefined();
+  expect(afterMutation![1]).not.toEqual(before[1]);
+  expect(afterMutation![0]).toEqual(before[0]);
+  expect(afterMutation!.slice(2)).toEqual(before.slice(2));
+  expect(await raceSnapshot()).toEqual(afterMutation);
+  expect(await env.DB.prepare("SELECT revision,deleted_at FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId, estimate.id).first()).toMatchObject(mutation === "revision" ? { revision: 2, deleted_at: null } : { revision: 1, deleted_at: start });
+});
