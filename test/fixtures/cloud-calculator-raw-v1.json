@@ -1,0 +1,247 @@
+{
+  "version": "usd-line-cents-v1",
+  "valid": [
+    {
+      "name": "plain",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          }
+        ],
+        "subtotal": "1.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "1.00",
+        "taxAmount": "0.00",
+        "total": "1.00"
+      }
+    },
+    {
+      "name": "escaped unique ASCII keys",
+      "raw": "{\"\\u0063urrency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unit\\u0050rice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          }
+        ],
+        "subtotal": "1.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "1.00",
+        "taxAmount": "0.00",
+        "total": "1.00"
+      }
+    },
+    {
+      "name": "keys in separate line scopes",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"},{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          }
+        ],
+        "subtotal": "2.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "2.00",
+        "taxAmount": "0.00",
+        "total": "2.00"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "conflicting nested unit price",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\",\"unitPrice\":\"9\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "identical nested unit price",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "conflicting root currency",
+      "raw": "{\"currency\":\"EUR\",\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "identical root currency",
+      "raw": "{\"currency\":\"USD\",\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "escaped equivalent nested key",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\",\"unit\\u0050rice\":\"9\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "escaped equivalent root key",
+      "raw": "{\"currency\":\"USD\",\"\\u0063urrency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "duplicate lines container",
+      "raw": "{\"currency\":\"USD\",\"lines\":[],\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "UTF8 BOM",
+      "raw": "\ufeff{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "trailing document",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"} {}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "malformed JSON",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"",
+      "error": "invalid_input"
+    },
+    {
+      "name": "unknown field remains invalid",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\",\"extra\":true}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "unpaired Unicode escape",
+      "raw": "{\"currency\":\"\\ud800\",\"lines\":[{\"quantity\":\"1\",\"unitPrice\":\"1\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "invalid_input"
+    },
+    {
+      "name": "raw arithmetic overflow preserves code",
+      "raw": "{\"currency\":\"USD\",\"lines\":[{\"quantity\":\"999999999\",\"unitPrice\":\"999999999\"}],\"discountAmount\":\"0\",\"taxRatePercent\":\"0\"}",
+      "error": "amount_out_of_range"
+    }
+  ],
+  "preflightValid": [
+    {
+      "name": "delimiters quotes and escaped backslashes inside strings",
+      "raw": "{\"quote\\\"\\\\key\": \"},:[\\\"\\\\\", \"normal\": \"\\\\\", \"nested\": {\"quote\\\"\\\\key\": 1}}"
+    },
+    {
+      "name": "same names in independent nested scopes",
+      "raw": "{\"a\":{\"x\":1},\"b\":[{\"x\":2},{\"x\":3}]}"
+    },
+    {
+      "name": "escaped unique Unicode key",
+      "raw": "{\"\\u00e9\":1,\"x\":2}"
+    },
+    {
+      "name": "distinct canonical Unicode sequences",
+      "raw": "{\"\u00e9\":1,\"e\u0301\":2}"
+    },
+    {
+      "name": "supplementary Unicode key",
+      "raw": "{\"\ud83d\ude00\":1}"
+    },
+    {
+      "name": "root scalar string",
+      "raw": "\"\\\"\\\\{}[]\""
+    },
+    {
+      "name": "root scalar number",
+      "raw": "1"
+    }
+  ],
+  "preflightInvalid": [
+    {
+      "name": "escaped equivalent Unicode keys",
+      "raw": "{\"\u00e9\":1,\"\\u00e9\":2}"
+    },
+    {
+      "name": "escaped supplementary equivalent keys",
+      "raw": "{\"\ud83d\ude00\":1,\"\\ud83d\\ude00\":2}"
+    },
+    {
+      "name": "nested duplicate does not leak from parent",
+      "raw": "{\"x\":1,\"a\":{\"x\":2,\"x\":3}}"
+    },
+    {
+      "name": "empty duplicate key",
+      "raw": "{\"\":1,\"\":2}"
+    },
+    {
+      "name": "BOM",
+      "raw": "\ufeff{}"
+    },
+    {
+      "name": "trailing document",
+      "raw": "{} []"
+    },
+    {
+      "name": "trailing primitive",
+      "raw": "1 true"
+    },
+    {
+      "name": "invalid object comma",
+      "raw": "{\"a\":1,}"
+    },
+    {
+      "name": "invalid array comma",
+      "raw": "[1,,2]"
+    },
+    {
+      "name": "invalid escape",
+      "raw": "{\"x\":\"\\q\"}"
+    },
+    {
+      "name": "unterminated escaped quote",
+      "raw": "{\"x\":\"abc\\\"}"
+    },
+    {
+      "name": "unpaired surrogate key",
+      "raw": "{\"\\ud800\":1}"
+    },
+    {
+      "name": "unpaired surrogate value",
+      "raw": "{\"a\":\"\\udc00\"}"
+    },
+    {
+      "name": "missing colon",
+      "raw": "{\"x\" 1}"
+    },
+    {
+      "name": "mismatched delimiters",
+      "raw": "[{]}"
+    },
+    {
+      "name": "empty document",
+      "raw": ""
+    },
+    {
+      "name": "invalid trailing array comma",
+      "raw": "[1,]"
+    },
+    {
+      "name": "unescaped control in string",
+      "raw": "{\"a\":\"\u0001\"}"
+    }
+  ]
+}

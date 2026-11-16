@@ -1,3 +1,5 @@
+import { parseStrictJSON } from "../json";
+
 export const CALCULATION_VERSION = "usd-line-cents-v1";
 
 export class CalculationError extends Error {
@@ -127,4 +129,13 @@ export function calculateDocumentV1(input: unknown): CalculationResult {
     taxAmount: money(taxAmount),
     total: money(total),
   };
+}
+
+// Use at raw request boundaries before any SDK/JSON object parsing.
+// Parser failures are invalid input; arithmetic overflow retains its own code.
+export function calculateDocumentJSONV1(bytes: Uint8Array): CalculationResult {
+  let input: unknown;
+  try { input = parseStrictJSON(bytes); }
+  catch { throw new CalculationError("invalid_input"); }
+  return calculateDocumentV1(input);
 }

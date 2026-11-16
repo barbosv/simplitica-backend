@@ -53,3 +53,15 @@
 - [ ] Write/run `swift test --package-path Shared/CloudInvoiceCore` RED for missing behavior and independent line rounding/normalization contract. Tests must execute assertions, not skip for simulator limitations.
 - [ ] Implement strict DTO decoding and bounded Decimal calculator using explicit locale and rounding; verify malformed numeric/unknown fields, operation bounds, input immutability and stable output.
 - [ ] Run package tests GREEN with zero skipped tests, compiler diagnostics and identical fixture digest; independently review native commit range using its own repository. Commit/push the isolated native feature branch. Then continue into owned D1 record authoring and MCP tools without requesting milestone approval.
+
+## Task 3 — Final duplicate-name fix wave (2026-11-15)
+
+Scope for this wave overrides earlier continuation/push instructions: fix I1 only, no subagents, pushes, route/app wiring, provider actions, deployments or migrations. Backend BASE `9a4b19c0f407373894c846834aaee8f1e5f2ea62`; native BASE `52657929745d8c7d8afe6ae88e4bb8e087705aef`.
+
+- Capture behavioral RED against both actual raw calculator calls with conflicting and identical duplicate names.
+- Add reusable `parseStrictJSON(Uint8Array)` and `calculateDocumentJSONV1` on the server; preflight native Data before eager DTO decoding. Use bounded structural scans plus maintained platform parsers, 64 KiB/depth 16, exact decoded UTF-8 key equality, no Unicode normalization, explicit BOM rejection, fixed sanitized errors and preserved arithmetic overflow.
+- Copy literal raw fixtures byte-for-byte; cover scopes, escapes, Unicode, malformed/trailing JSON/UTF-8 and exact byte/depth boundaries. Keep the original 133 fixtures unchanged.
+- Verify affected/full Worker and Node suites, native debug/release, lint/type/build checks and fixture digests; record actual RED/GREEN, warnings and limitations in `.superpowers/sdd/2026-11-15-invoice-calculation/final-fix-report.md`.
+- Self-review task-owned changes and commit separately in each repository for the root's dual-scoped review.
+
+Future Worker/MCP ingress must call the strict raw helper before SDK/object decoding discards names. Direct DTO/object decoding alone does not satisfy the boundary contract or protect request hashes.
