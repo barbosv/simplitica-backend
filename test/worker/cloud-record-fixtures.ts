@@ -12,7 +12,7 @@ export const start = 1_800_000_010_000;
 export const fact = (id = "one") => ({ appSlug: "simpli-invoice" as const, environment: "Sandbox" as const, originalTransactionId: `lineage-${id}`, state: "active" as const, expiresAt: start + 999_999, graceExpiresAt: null, signedAt: start, checkedAt: start });
 export async function reset() {
   await applyD1Migrations(env.DB, env.TEST_CLOUD_MIGRATIONS);
-  for (const table of ["cloud_record_feed", "cloud_mutation_receipts", "cloud_business_profiles", "cloud_customers", "cloud_saved_rates", "cloud_entitlements", "cloud_record_state", "cloud_connections", "cloud_enrollment_commits", "cloud_purchase_lineages", "cloud_devices", "cloud_businesses", "cloud_identities", "cloud_owners", "cloud_enrollment_challenges", "cloud_batch_guards"]) await env.DB.prepare(`DELETE FROM ${table}`).run();
+  for (const table of ["cloud_issued_numbers", "cloud_number_reservations", "cloud_number_state", "cloud_record_feed", "cloud_mutation_receipts", "cloud_business_profiles", "cloud_customers", "cloud_saved_rates", "cloud_entitlements", "cloud_record_state", "cloud_connections", "cloud_enrollment_commits", "cloud_purchase_lineages", "cloud_devices", "cloud_businesses", "cloud_identities", "cloud_owners", "cloud_enrollment_challenges", "cloud_batch_guards"]) await env.DB.prepare(`DELETE FROM ${table}`).run();
 }
 export async function setup(id = "one", ready = true) {
   const identity = { issuer: CLOUD_ISSUER, appleIdentity: `apple-${id}` };

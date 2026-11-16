@@ -1,5 +1,5 @@
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-export type RecordErrorCode = "invalid_input" | "not_authorized" | "not_ready" | "entitlement_required" | "revision_conflict" | "operation_conflict" | "not_found" | "resync_required" | "storage_unavailable" | "invalid_configuration";
+export type RecordErrorCode = "invalid_input" | "not_authorized" | "not_ready" | "entitlement_required" | "revision_conflict" | "operation_conflict" | "not_found" | "resync_required" | "storage_unavailable" | "invalid_configuration" | "number_collision" | "numbering_exhausted";
 export class RecordError extends Error {
   constructor(public readonly code: RecordErrorCode) { super(code); this.name = "RecordError"; }
 }
