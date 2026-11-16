@@ -5,6 +5,52 @@ import type { CloudRecordAuthority } from "../../src/chatgpt/records/authority.j
 import type { MutationPlan } from "../../src/chatgpt/records/types.js";
 import { env, namespace, start, reset, setup, state } from "./cloud-record-fixtures.js";
 beforeEach(reset);
+it.each(["connection", "freshness", "none"])("rechecks authority after a lost-response receipt read: %s", async reason => {
+  const { authority, owner } = await setup();
+  let now = start, responseLost = false, intercepted = false;
+  let afterReceipt: Awaited<ReturnType<typeof state>> | undefined;
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, { get(target, key) {
+    if (key === "bind") return (...values: unknown[]) => wrap(target.bind(...values));
+    if (key === "first") return async () => {
+      const row = await target.first();
+      if (responseLost && row) {
+        intercepted = true;
+        if (reason === "connection") await env.DB.prepare("UPDATE cloud_connections SET status='revoked' WHERE owner_id=?").bind(owner.ownerId).run();
+        if (reason === "freshness") now += 300001;
+        afterReceipt = await state();
+      }
+      return row;
+    };
+    const value = Reflect.get(target, key, target); return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const db = new Proxy(env.DB, { get(target, key) {
+    if (key === "batch") return async (statements: D1PreparedStatement[]) => {
+      await target.batch(statements);
+      responseLost = true;
+      throw new Error("synthetic lost response after successful commit");
+    };
+    if (key === "withSession") return (constraint: D1SessionBookmark | D1SessionConstraint) => {
+      const session = target.withSession(constraint);
+      return new Proxy(session, { get(current, property) {
+        if (property === "prepare") return (sql: string) => {
+          const statement = current.prepare(sql);
+          return sql.startsWith("SELECT kind,request_hash,response_snapshot") ? wrap(statement) : statement;
+        };
+        const value = Reflect.get(current, property, current); return typeof value === "function" ? value.bind(current) : value;
+      } });
+    };
+    const value = Reflect.get(target, key, target); return typeof value === "function" ? value.bind(target) : value;
+  } });
+  const pending = kernel(() => now, db).commit(authority, command("lost-response"), plan(owner.ownerId));
+  if (reason === "none") expect(await pending).toMatchObject({ revision: 1, value: { name: "Alice" } });
+  else await expect(pending).rejects.toMatchObject({ code: reason === "connection" ? "not_authorized" : "entitlement_required" });
+  expect(intercepted).toBe(true);
+  expect(await state()).toEqual(afterReceipt);
+  expect(afterReceipt!.cloud_customers).toHaveLength(1);
+  expect(afterReceipt!.cloud_mutation_receipts).toHaveLength(1);
+  expect(afterReceipt!.cloud_record_feed).toHaveLength(1);
+  expect(afterReceipt!.cloud_batch_guards).toEqual([]);
+});
 const kernel = (now = () => start, db = env.DB) => createCloudRecordKernel(db, { authorizationNamespace: namespace, now });
 const command = (operationKey = "op", request: unknown = { name: "Alice", revision: 0 }) => ({ operationKey, kind: "customer.create", request: request as never });
 function plan(ownerId: string, id = crypto.randomUUID(), payload = { name: "Alice" }, fail = false): (at: number) => MutationPlan {

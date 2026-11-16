@@ -119,8 +119,8 @@ export function createCloudRecordKernel(db: D1Database, dependencies: { authoriz
       } catch {
         // A failed SQL call is never success by itself. Only a committed matching
         // ledger row can establish the winning result after rollback/response loss.
-        await authorize(a, true);
         const winner = await receipt(a, operationKey);
+        await authorize(a, true);
         if (winner) return replay(winner, kind, hash);
         let valid;
         try { valid = await primary().prepare(`SELECT CASE WHEN (${plan.condition.sql}) THEN 1 ELSE 0 END AS valid`).bind(...plan.condition.values).first<number>("valid"); } catch { throw new RecordError("storage_unavailable"); }

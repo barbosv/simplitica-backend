@@ -9,10 +9,10 @@ import { buildDocumentPreview, createDocumentPreviewService } from "./preview.js
 import { normalizeDocumentInput, readReferenceRevision } from "./validation.js";
 import type { DocumentValue } from "./types.js";
 
-type Row = { id: string; revision: number; created_at: number; updated_at: number; deleted_at: number | null; payload: string; state: DocumentValue["state"]; document_type: "invoice" | "estimate" };
+type Row = { id: string; number: string; revision: number; created_at: number; updated_at: number; deleted_at: number | null; payload: string; state: DocumentValue["state"]; document_type: "invoice" | "estimate" };
 const json = (v: unknown): JsonValue => JSON.parse(encodeRecordJSON(v)) as JsonValue;
 const rowRecord = (r: Row): VersionedRecord<DocumentValue> => {
-  try { return { id: r.id, revision: r.revision, createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at, value: { ...JSON.parse(r.payload) as DocumentValue, state: r.state, documentType: r.document_type } }; }
+  try { return { id: r.id, revision: r.revision, createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at, value: { ...JSON.parse(r.payload) as DocumentValue, state: r.state, documentType: r.document_type, number: r.number } }; }
   catch { throw new RecordError("storage_unavailable"); }
 };
 const source = (v: DocumentValue) => ({ documentType: v.documentType, issueDate: v.issueDate, serviceDate: v.serviceDate, dueDate: v.dueDate, title: v.title, notes: v.notes, paymentTermsSummary: v.paymentTermsSummary, jobSiteId: v.jobSite?.id ?? null, lines: v.lines.map(({ id, title, detail, quantity, unitPrice, unit, kind, reportedProvenance }) => ({ ...(id === null ? {} : { id }), title, detail, quantity, unitPrice, unit, kind, reportedProvenance: { kind: reportedProvenance.kind, reference: reportedProvenance.reference, asOf: reportedProvenance.asOf } })), discountAmount: v.discountAmount });
@@ -40,7 +40,7 @@ export function createCloudDocumentRepository(db: D1Database, dependencies: { au
   const preview = createDocumentPreviewService(db, dependencies);
   const owned = async (a: CloudRecordAuthority, id: string, authoring: boolean) => {
     const read = authoring ? kernel.readAuthoring : kernel.readOwned;
-    const rows = await read<Row>(a, db.prepare("SELECT id,revision,created_at,updated_at,deleted_at,payload,state,document_type FROM cloud_documents WHERE owner_id=? AND id=? AND deleted_at IS NULL").bind(a.ownerId,id));
+    const rows = await read<Row>(a, db.prepare("SELECT id,number,revision,created_at,updated_at,deleted_at,payload,state,document_type FROM cloud_documents WHERE owner_id=? AND id=? AND deleted_at IS NULL").bind(a.ownerId,id));
     if (!rows[0]) throw new RecordError("not_found");
     return rows[0];
   };

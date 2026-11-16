@@ -3,6 +3,20 @@ import { createCloudRecordRepository } from "../../src/chatgpt/records/repositor
 import { createCloudDocumentRepository } from "../../src/chatgpt/documents/repository.js";
 import { env, namespace, reset, setup, start } from "./cloud-record-fixtures.js";
 beforeEach(reset);
+it.each(["N-999", null])("uses the issued number column despite a mismatched payload: %s", async badNumber => {
+  const f=await fixture(), draft=await f.repo.createDocument(f.authority,request("numbered"));
+  const beforeNumbers=await Promise.all(["cloud_number_state","cloud_issued_numbers"].map(async table=>(await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
+  await env.DB.prepare("UPDATE cloud_documents SET payload=json_set(payload,'$.number',?) WHERE owner_id=? AND id=?").bind(badNumber,f.owner.ownerId,draft.id).run();
+  expect((await f.repo.getDocument(f.authority,draft.id)).value.number).toBe(draft.value.number);
+  const updated=await f.repo.updateDocument(f.authority,{operationKey:"number-edit",id:draft.id,expectedRevision:1,patch:{title:"Edited"}});
+  expect(updated.value.number).toBe(draft.value.number);
+  const persisted=await env.DB.prepare("SELECT number,json_extract(payload,'$.number') AS payloadNumber FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId,draft.id).first();
+  expect(persisted).toEqual({number:draft.value.number,payloadNumber:draft.value.number});
+  const feed=await env.DB.prepare("SELECT json_extract(payload,'$.value.number') AS number FROM cloud_record_feed WHERE owner_id=? AND id=? AND revision=2").bind(f.owner.ownerId,draft.id).first("number");
+  expect(feed).toBe(draft.value.number);
+  expect(await f.repo.createDocument(f.authority,request("numbered"))).toEqual(draft);
+  expect(await Promise.all(["cloud_number_state","cloud_issued_numbers"].map(async table=>(await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results))).toEqual(beforeNumbers);
+});
 const customerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const business = { businessName: "Business", addressLines: [], tax: { enabled: false, ratePercent: "10", label: "Tax" }, timezone: "America/New_York" };
 const customer = { name: "Client", billingAddressLines: [], savedJobSites: [] };
