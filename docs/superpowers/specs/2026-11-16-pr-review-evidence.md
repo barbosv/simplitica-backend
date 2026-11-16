@@ -1,0 +1,11 @@
+# Address native PR10 review with reproducible evidence
+
+The owner's pasted static review examined native9918a71; current reviewed native170afb1 includes executed arm64 main tests and targeted money interpretation fixes. Correct stale presentation without claiming all native tests pass. Keep ongoing full integration and all production restrictions. No merge/history rewrite or notification/comment to reviewers.
+
+Commit sanitized local test summaries and a review/evidence overview with exact source ranges, commands, method counts, failed-method names and limits. Full xcresult bundles remain local; committed summaries are local evidence, not CI attestations. Re-run the isolated qualifier and calculator package for current evidence; reuse retained main/UI result bundles matching tested source instead of wastefully repeating unchanged main app. Never commit tokens/claims/secrets/raw live auth traces. Link the backend's sanitized live-identity report and clearly distinguish owner-assisted historical proof from repeatable synthetic tests and pending live/device gates.
+
+Add a reproducible backend CLI that verifies byte-identical calculator fixtures/digests, valid results/error codes and raw/preflight Unicode-key semantics against the actual server calculator. No new numeric rules. The native package still has no app target linkage; future wiring must preserve historical finalized amounts and record calculationVersion. Align stale docs/plan checkbox with actual already recorded live event.
+
+Directly exercise redirect refusal, rather than treating HTTP302 status rejection as redirect-delegate coverage. Make only the qualification-internal delegate test-visible; no production API/network change. A suspended URLSession task and synthetic302 response suffice without network. Explicit non-synchronizing Keychain test configuration matches real qualification storage. Document the loopback first-binder risk and verifier startup order; no new production proof behavior.
+
+Set verified repository-local GitHub no-reply identity for new commits, preserving existing history. After reviewed source/docs and concrete verification are pushed, update PR10 title/body with present scope/evidence/current remaining11unit and7UI failures; no auto-merge/production rollout. Leave cosmetic legacy filename rename outside this corrective scope.
