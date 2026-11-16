@@ -35,9 +35,9 @@
 - `CalculationResult` has `calculationVersion`, `currency`, `lines:Array<{quantity:string;unitPrice:string;lineTotal:string}>`, `subtotal`, `discountRequested`, `discountApplied`, `taxRatePercent`, `taxableAmount`, `taxAmount`, `total`, all numeric fields strings. Normalize quantity/tax minimally, unitPrice at least2 fractional places, monetary values exactly2. Reject unknown input/line keys and non-plain input shapes.
 - Fixture format `{version:"usd-line-cents-v1",valid:Array<{name:string;input:unknown;expected:CalculationResult}>,invalid:Array<{name:string;input:unknown;error:"invalid_input"|"amount_out_of_range"}>}`. Literal expected results are independent of implementation. Include significant-integer, scale, 32-character, 200-line and maximum-cent boundaries; valid JSON fixtures cannot represent undefined/prototype attacks, so cover those in Worker tests.
 
-- [ ] Write behavioral RED for the literal required examples, normalization-equivalent forms, fractional precision/ties, independent line rounding, discount capping, tax limits, input/output caps and malformed/extra fields. Assert input immutability and pure repeated output. Include values above Number.MAX_SAFE_INTEGER in scaled arithmetic with exact expected cents.
-- [ ] Implement bounded scaled BigInt parsing, multiplication, half-up division and string formatting; no SQLite or runtime dependency. Run `npm run test:worker -- test/worker/cloud-calculator.test.ts` GREEN.
-- [ ] Run relevant existing checks (full Worker/Node once, lint, Worker typecheck, build/dry build), capture actual results, independently review and commit. Record fixture SHA256 for Task2, then push reviewed feature branch while continuing.
+- [x] Write behavioral RED for the literal required examples, normalization-equivalent forms, fractional precision/ties, independent line rounding, discount capping, tax limits, input/output caps and malformed/extra fields. Assert input immutability and pure repeated output. Include values above Number.MAX_SAFE_INTEGER in scaled arithmetic with exact expected cents.
+- [x] Implement bounded scaled BigInt parsing, multiplication, half-up division and string formatting; no SQLite or runtime dependency. Run `npm run test:worker -- test/worker/cloud-calculator.test.ts` GREEN.
+- [x] Run relevant existing checks (full Worker/Node once, lint, Worker typecheck, build/dry build), capture actual results, independently review and commit. Record fixture SHA256 for Task2, then push reviewed feature branch while continuing.
 
 ## Task 2 — Native calculator parity package
 
@@ -50,9 +50,9 @@
 - Copy Task1 fixture file byte-for-byte after its review/commit. Record source backend SHA and fixture SHA256 in package README; run all literal valid/invalid cases, comparing every result field. Keep fixtures bounded before loading and no private data.
 - This reusable package is deliberately not added to production AppDependencies or InvoiceDraft yet; the ensuing native-sync work will integrate it with explicit versioning. Do not modify original checkout or its staged scheme edits, existing app/qualifier projects or production scheme. No package dependency downloads beyond standard Swift/Foundation.
 
-- [ ] Write/run `swift test --package-path Shared/CloudInvoiceCore` RED for missing behavior and independent line rounding/normalization contract. Tests must execute assertions, not skip for simulator limitations.
-- [ ] Implement strict DTO decoding and bounded Decimal calculator using explicit locale and rounding; verify malformed numeric/unknown fields, operation bounds, input immutability and stable output.
-- [ ] Run package tests GREEN with zero skipped tests, compiler diagnostics and identical fixture digest; independently review native commit range using its own repository. Commit/push the isolated native feature branch. Then continue into owned D1 record authoring and MCP tools without requesting milestone approval.
+- [x] Write/run `swift test --package-path Shared/CloudInvoiceCore` RED for missing behavior and independent line rounding/normalization contract. Tests must execute assertions, not skip for simulator limitations.
+- [x] Implement strict DTO decoding and bounded Decimal calculator using explicit locale and rounding; verify malformed numeric/unknown fields, operation bounds, input immutability and stable output.
+- [x] Run package tests GREEN with zero skipped tests, compiler diagnostics and identical fixture digest; independently review native commit range using its own repository. Commit/push the isolated native feature branch. Then continue into owned D1 record authoring and MCP tools without requesting milestone approval.
 
 ## Task 3 — Final duplicate-name fix wave (2026-11-15)
 
@@ -65,3 +65,7 @@ Scope for this wave overrides earlier continuation/push instructions: fix I1 onl
 - Self-review task-owned changes and commit separately in each repository for the root's dual-scoped review.
 
 Future Worker/MCP ingress must call the strict raw helper before SDK/object decoding discards names. Direct DTO/object decoding alone does not satisfy the boundary contract or protect request hashes.
+
+## Source verification
+
+Server and native tasks passed independent review. Whole-branch review found raw duplicate-key parity; one reviewed fix now rejects ambiguous raw JSON before object/DTO decoding on both sides. Final evidence:814 Worker/167 Node,186 affected tests, Swift debug/release14 XCTest methods each with zero skips, unchanged133 numeric fixtures and shared raw fixtures. Existing historical calculations/main-app wiring remain unchanged; records and transport integration continue next.
