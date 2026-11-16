@@ -1,4 +1,4 @@
-import { createMcpHandler } from "@modelcontextprotocol/server";
+import { createCloudToolTransport } from "../../src/chatgpt/tools/transport.js";
 import { beforeEach, expect, it } from "vitest";
 import { createCloudToolServer } from "../../src/chatgpt/tools/server.js";
 import { createCloudRecordRepository } from "../../src/chatgpt/records/repository.js";
@@ -6,7 +6,7 @@ import { env, namespace, reset, setup, start } from "./cloud-record-fixtures.js"
 beforeEach(reset);
 const deps={authorizationNamespace:namespace,now:()=>start};
 async function rpc(server: ReturnType<typeof createCloudToolServer>, method:string, params:unknown={}) {
- const handler=createMcpHandler(()=>server,{responseMode:"json",maxSubscriptions:0,keepAliveMs:0});
+ const handler=createCloudToolTransport(()=>server);
  const request=new Request("https://test.invalid/mcp",{method:"POST",headers:{"content-type":"application/json",accept:"application/json, text/event-stream","mcp-protocol-version":"2025-11-25"},body:JSON.stringify({jsonrpc:"2.0",id:1,method,params})});
  const response=await handler.fetch(request); const text=await response.text();
  return JSON.parse(text.startsWith("event:") ? text.split("\n").find(line=>line.startsWith("data: "))!.slice(6) : text);

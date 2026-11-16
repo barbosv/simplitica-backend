@@ -1,8 +1,17 @@
 // Raw ingress must run this before SDK/object decoding discards duplicate names.
 // This scans structure and string tokens only; JSON.parse owns the JSON grammar.
 export function parseStrictJSON(bytes: Uint8Array): unknown {
+  return parseBoundedJSON(bytes, 65_536);
+}
+// Trusted source configuration only; never take this bound from request data.
+export function createStrictJSONParser(configuration: { maximumBytes: number }) {
+  const maximumBytes = configuration?.maximumBytes;
+  if (!Number.isInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 1_048_576) throw new Error("invalid_configuration");
+  return (bytes: Uint8Array): unknown => parseBoundedJSON(bytes, maximumBytes);
+}
+function parseBoundedJSON(bytes: Uint8Array, maximumBytes: number): unknown {
   try {
-    if (bytes.byteLength > 65_536) throw new Error();
+    if (bytes.byteLength > maximumBytes) throw new Error();
     // Preserve a BOM during decoding so the common policy can reject it explicitly.
     const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     if (source.charCodeAt(0) === 0xfeff) throw new Error();
