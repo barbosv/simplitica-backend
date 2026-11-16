@@ -48,17 +48,48 @@ export function createCloudRecordKernel(db: D1Database, dependencies: { authoriz
     if (row.kind !== kind || row.request_hash !== hash) throw new RecordError("operation_conflict");
     try { return JSON.parse(row.response_snapshot) as JsonValue; } catch { throw new RecordError("storage_unavailable"); }
   }
-  return {
+  async function commandHash(command: MutationCommand): Promise<string> {
+    if (!command || typeof command.operationKey !== "string" || !/^[A-Za-z0-9:_-]{1,128}$/.test(command.operationKey) || !isLabel(command.kind)) throw new RecordError("invalid_input");
+    const bytes = new TextEncoder().encode(`[${JSON.stringify(command.kind)},${encodeRecordJSON(command.request)}]`);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function read<T>(a: CloudRecordAuthority, statement: D1PreparedStatement, authoring: boolean): Promise<T[]> {
+    requireRecordAuthority(a, namespace);
+    const at = sample();
+    let results;
+    try { results = await primary().batch([db.prepare(stateSQL).bind(...stateValues(a, at)), statement]); }
+    catch { throw new RecordError("storage_unavailable"); }
+    checkState(results[0].results[0] as StateRow | undefined, authoring);
+    return results[1].results as T[];
+  }
+  const kernel = {
+    readOwned: <T>(a: CloudRecordAuthority, statement: D1PreparedStatement) => read<T>(a, statement, false),
+    readAuthoring: <T>(a: CloudRecordAuthority, statement: D1PreparedStatement) => read<T>(a, statement, true),
+    async prepareAndCommit(a: CloudRecordAuthority, command: MutationCommand, prepare: () => Promise<(at: number) => MutationPlan>): Promise<JsonValue> {
+      requireRecordAuthority(a, namespace);
+      const hash = await commandHash(command);
+      await authorize(a, true);
+      const existing = await receipt(a, command.operationKey);
+      if (existing) return replay(existing, command.kind, hash);
+      let build;
+      try { build = await prepare(); }
+      catch (error) {
+        await authorize(a, true);
+        const winner = await receipt(a, command.operationKey);
+        if (winner) return replay(winner, command.kind, hash);
+        if (error instanceof RecordError) throw error;
+        throw new RecordError("storage_unavailable");
+      }
+      return kernel.commit(a, command, build);
+    },
     authorizeRead: (a: CloudRecordAuthority) => authorize(a, false),
     authorizeAuthoring: (a: CloudRecordAuthority) => authorize(a, true),
     async commit(a: CloudRecordAuthority, command: MutationCommand, build: (at: number) => MutationPlan): Promise<JsonValue> {
       requireRecordAuthority(a, namespace);
-      if (!command || typeof command.operationKey !== "string" || !/^[A-Za-z0-9:_-]{1,128}$/.test(command.operationKey) || !isLabel(command.kind) || typeof build !== "function") throw new RecordError("invalid_input");
+      if (typeof build !== "function") throw new RecordError("invalid_input");
+      const hash = await commandHash(command);
       const { operationKey, kind } = command;
-      const normalized = encodeRecordJSON(command.request);
-      const bytes = new TextEncoder().encode(`[${JSON.stringify(kind)},${normalized}]`);
-      const digest = await crypto.subtle.digest("SHA-256", bytes);
-      const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
       const existing = await receipt(a, operationKey);
       if (existing) { await authorize(a, true); return replay(existing, kind, hash); }
       // All asynchronous record planning and hashing precede this trusted sample.
@@ -125,6 +156,7 @@ export function createCloudRecordKernel(db: D1Database, dependencies: { authoriz
       return { changes, nextCursor: { epoch, after: changes.at(-1)?.sequence ?? after }, head: state.head, hasMore: rows[0].hasMore === 1 };
     },
   };
+  return kernel;
 }
 // Internal retention primitive only. Never reset AUTOINCREMENT or persisted head.
 export async function pruneOwnerFeed(db: D1Database, ownerId: string, expectedEpoch: string, through: number): Promise<void> {
