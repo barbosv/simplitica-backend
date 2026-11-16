@@ -21,7 +21,8 @@
     "dev:qualify": "wrangler dev --config wrangler.qualify.jsonc --ip 127.0.0.1 --infer-origin-from-routes=false",
     "build:qualify": "tsc -p tsconfig.worker.json --noEmit && wrangler deploy --config wrangler.qualify.jsonc --dry-run --outdir dist-worker/qualify",
     "qualify:oauth": "tsx scripts/qualification/run-managed-oauth.ts",
-    "qualify:identity": "tsx scripts/qualification/run-identity-qualification.ts"
+    "qualify:identity": "tsx scripts/qualification/run-identity-qualification.ts",
+    "qualify:calculator-parity": "tsx scripts/qualification/check-calculator-parity.ts"
   },
   "repository": {
     "type": "git",
