@@ -24,6 +24,9 @@ const freeSql = `NOT EXISTS (SELECT 1 FROM cloud_issued_numbers i WHERE i.owner_
  AND NOT EXISTS (SELECT 1 FROM cloud_number_reservations r WHERE r.owner_id=? AND c.n=r.prefix || printf('%0*d',r.pad_length,CAST(substr(c.n,length(r.prefix)+1) AS INTEGER)) AND CAST(substr(c.n,length(r.prefix)+1) AS INTEGER) BETWEEN r.start_index AND r.end_index)`;
 const candidateSql = `SELECT NOT EXISTS (SELECT 1 FROM (SELECT ? AS n) c WHERE NOT (${freeSql})) AS ok`;
 const blockSql = `WITH RECURSIVE candidates(i) AS (SELECT ? UNION ALL SELECT i+1 FROM candidates WHERE i<?) SELECT NOT EXISTS (SELECT 1 FROM (SELECT ? || printf('%0*d',?,i) AS n FROM candidates) c WHERE NOT (${freeSql})) AS ok`;
+// Search the complete bounded window in one D1 call. Each block contributes
+// exactly width formatted strings, and every string must be unoccupied.
+const windowSql = `WITH RECURSIVE offsets(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM offsets WHERE n<?), digits(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM digits WHERE i<?), formatted AS (SELECT offsets.n AS block, ? || printf('%0*d',?,?+offsets.n*?+digits.i) AS n FROM offsets CROSS JOIN digits) SELECT block FROM formatted c GROUP BY block HAVING SUM(CASE WHEN ${freeSql} THEN 0 ELSE 1 END)=0 ORDER BY block LIMIT 1`;
 export function createNumberingPlanner(db: D1Database) {
   const read = (sql: string) => db.withSession("first-primary").prepare(sql);
   async function state(owner: string, ready: boolean): Promise<State> {
@@ -41,6 +44,12 @@ export function createNumberingPlanner(db: D1Database) {
     const row = await read(candidateSql).bind(number,owner,owner).first<{ok:number}>();
     return row?.ok === 1;
   }
+  async function selectOffset(owner: string, s: State, width: number): Promise<number | null> {
+    const maxOffset=Math.min(255,Math.floor((MAX-1-s.next_index-(width-1))/width));
+    if (maxOffset<0) return null;
+    const row=await read(windowSql).bind(maxOffset,width-1,s.prefix,s.pad_length,s.next_index,width,owner,owner).first<{block:number}>();
+    return row?.block ?? null;
+  }
   async function docFree(owner: string, doc: string) {
     if (await read("SELECT 1 FROM cloud_issued_numbers WHERE owner_id=? AND document_id=?").bind(owner,doc).first()) fail("number_collision");
   }
@@ -57,23 +66,17 @@ export function createNumberingPlanner(db: D1Database) {
   const methods = {
     async prepareServerAllocation(owner: string, doc: string): Promise<Builder> {
       inputs(owner,doc); const s = await state(owner,true); await docFree(owner,doc);
-      for (let offset=0;offset<256;offset++) {
-        const index=s.next_index+offset; if (!safe(index) || index >= MAX) break;
-        const number=format(s,index); if (!await isFree(owner,number)) continue;
-        return at => { timestamp(at); return {number,index, condition:condition(owner,s,undefined,freeCondition,[number,owner,owner,owner,doc]),statements:[update(owner,index+1),issue(owner,number,doc,index,null,at)]}; };
-      }
-      return fail("numbering_exhausted");
+      const offset=await selectOffset(owner,s,1); if (offset===null) return fail("numbering_exhausted");
+      const index=s.next_index+offset, number=format(s,index);
+      return at => { timestamp(at); return {number,index, condition:condition(owner,s,undefined,freeCondition,[number,owner,owner,owner,doc]),statements:[update(owner,index+1),issue(owner,number,doc,index,null,at)]}; };
     },
     async prepareReservation(owner: string, device: string, id: string): Promise<Builder> {
       inputs(owner,undefined,device,id); const s=await state(owner,true); await active(owner,device);
       if (await read("SELECT 1 FROM cloud_number_reservations WHERE owner_id=? AND id=?").bind(owner,id).first()) fail("number_collision");
-      for (let offset=0;offset<256;offset++) {
-        const start=s.next_index+offset*20, end=start+19; if (!safe(end) || end>=MAX) break;
-        const row=await read(blockSql).bind(start,end,s.prefix,s.pad_length,owner,owner).first<{ok:number}>(); if (!row?.ok) continue;
-        const reservation={id,deviceKeyId:device,startIndex:start,endIndex:end,prefix:s.prefix,padLength:s.pad_length};
-        return at => { timestamp(at); return {number:null,index:null,reservation,condition:condition(owner,s,device,` AND (${blockSql}) AND NOT EXISTS (SELECT 1 FROM cloud_number_reservations WHERE owner_id=? AND id=?)`,[start,end,s.prefix,s.pad_length,owner,owner,owner,id]),statements:[update(owner,end+1),db.prepare("INSERT INTO cloud_number_reservations(owner_id,id,device_key_id,start_index,end_index,prefix,pad_length,created_at) VALUES (?,?,?,?,?,?,?,?)").bind(owner,id,device,start,end,s.prefix,s.pad_length,at)]}; };
-      }
-      return fail("numbering_exhausted");
+      const offset=await selectOffset(owner,s,20); if (offset===null) return fail("numbering_exhausted");
+      const start=s.next_index+offset*20, end=start+19;
+      const reservation={id,deviceKeyId:device,startIndex:start,endIndex:end,prefix:s.prefix,padLength:s.pad_length};
+      return at => { timestamp(at); return {number:null,index:null,reservation,condition:condition(owner,s,device,` AND (${blockSql}) AND NOT EXISTS (SELECT 1 FROM cloud_number_reservations WHERE owner_id=? AND id=?)`,[start,end,s.prefix,s.pad_length,owner,owner,owner,id]),statements:[update(owner,end+1),db.prepare("INSERT INTO cloud_number_reservations(owner_id,id,device_key_id,start_index,end_index,prefix,pad_length,created_at) VALUES (?,?,?,?,?,?,?,?)").bind(owner,id,device,start,end,s.prefix,s.pad_length,at)]}; };
     },
     async prepareReservedIssuance(owner: string, device: string, id: string, index: number, doc: string): Promise<Builder> {
       inputs(owner,doc,device,id); if (!safe(index)) fail("invalid_input"); const s=await state(owner,true); await active(owner,device);

@@ -112,3 +112,76 @@ it("stops after 256 occupied candidates without modifying state", async () => {
   await expect(planner().prepareServerAllocation(owner,id())).rejects.toMatchObject({code:"numbering_exhausted"});
   expect(await env.DB.prepare("SELECT next_index FROM cloud_number_state WHERE owner_id=?").bind(owner).first("next_index")).toBe(1);
 });
+
+// A forwarding adapter counts binding executions, while all SQL still runs on real D1.
+// The simulated Free limit is deliberately larger than the planner's eight-call budget.
+function budgetDb() {
+  let calls=0;
+  const count = () => { if (++calls > 50) throw new Error("simulated invocation query limit"); };
+  const wrapStatement = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+    get(target, key) {
+      if (key === "bind") return (...args: unknown[]) => wrapStatement(target.bind(...args));
+      if (key === "first" || key === "all" || key === "run" || key === "raw") return (...args: unknown[]) => { count(); return (target[key] as (...args: unknown[]) => unknown).apply(target,args); };
+      const value=Reflect.get(target,key,target); return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+  const db = new Proxy(env.DB, { get(target,key) {
+    if (key === "withSession") return (...args: Parameters<D1Database["withSession"]>) => {
+      const session=target.withSession(...args);
+      return new Proxy(session, { get(s,k) {
+        if (k === "prepare") return (sql: string) => wrapStatement(s.prepare(sql));
+        if (k === "batch") return (...batchArgs: Parameters<D1DatabaseSession["batch"]>) => { count(); return s.batch(...batchArgs); };
+        const value=Reflect.get(s,k,s); return typeof value === "function" ? value.bind(s) : value;
+      }});
+    };
+    if (key === "prepare") return (sql: string) => wrapStatement(target.prepare(sql));
+    if (key === "batch") return (...args: Parameters<D1Database["batch"]>) => { count(); return target.batch(...args); };
+    const value=Reflect.get(target,key,target); return typeof value === "function" ? value.bind(target) : value;
+  }});
+  return {db,calls:()=>calls};
+}
+async function occupy(owner: string, numbers: number[]) {
+  await env.DB.batch(numbers.map(n=>env.DB.prepare("INSERT INTO cloud_issued_numbers(owner_id,formatted_number,document_id,issued_at) VALUES (?,?,?,?)").bind(owner,String(n),id(),start)));
+}
+it.each(["server-late", "server-exhausted", "reservation-late", "reservation-exhausted"])("bounds real D1 prepare calls for %s", async scenario => {
+  const a=await setup(), owner=a.owner.ownerId; await seed(owner);
+  const reservation=scenario.startsWith("reservation"), exhausted=scenario.endsWith("exhausted");
+  const count=exhausted ? 256 : 200;
+  await occupy(owner,Array.from({length:count},(_,i)=>reservation ? 1+i*20 : 1+i));
+  const before=await env.DB.prepare("SELECT * FROM cloud_number_state WHERE owner_id=?").bind(owner).first();
+  const budget=budgetDb(), p=createNumberingPlanner(budget.db);
+  const attempt=reservation ? p.prepareReservation(owner,a.deviceKeyId,id()) : p.prepareServerAllocation(owner,id());
+  if (exhausted) await expect(attempt).rejects.toMatchObject({code:"numbering_exhausted"});
+  else {
+    const plan=(await attempt)(start);
+    expect(reservation ? plan.reservation?.startIndex : plan.index).toBe(reservation ? 4001 : 201);
+  }
+  expect(budget.calls()).toBeLessThanOrEqual(8);
+  expect(await env.DB.prepare("SELECT * FROM cloud_number_state WHERE owner_id=?").bind(owner).first()).toEqual(before);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM cloud_number_reservations WHERE owner_id=?").bind(owner).first("n")).toBe(0);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM cloud_issued_numbers WHERE owner_id=?").bind(owner).first("n")).toBe(count);
+});
+it("requires an owner in numbering state at the storage boundary", async () => {
+  await expect(env.DB.prepare("INSERT INTO cloud_number_state VALUES (NULL,1,1,'',1,1)").run()).rejects.toThrow();
+});
+it("commits exactly one concurrently competing cloud kernel plan", async () => {
+  const a=await setup(), owner=a.owner.ownerId; await seed(owner);
+  const docs=[id(),id()], builds=await Promise.all(docs.map(doc=>planner().prepareServerAllocation(owner,doc)));
+  const k=createCloudRecordKernel(env.DB,{authorizationNamespace:namespace,now:()=>start});
+  const race=await Promise.allSettled(builds.map((build,i)=>k.commit(a.authority,{operationKey:`number-race-${i}`,kind:"document.create",request:{id:docs[i]}},at=>{
+    const p=build(at); return {...p,statements:[...p.statements,env.DB.prepare("INSERT INTO cloud_customers(owner_id,id,revision,created_at,updated_at,payload,search_text) VALUES (?,?,1,?,?,?,?)").bind(owner,docs[i],at,at,"{}","")],events:[{kind:"document",id:docs[i],revision:1,payload:{number:p.number},tombstone:false}],response:{id:docs[i],number:p.number}};
+  })));
+  expect(race.filter(x=>x.status==="fulfilled")).toHaveLength(1);
+  expect(race.filter(x=>x.status==="rejected")).toHaveLength(1);
+  const numbers=(await env.DB.prepare("SELECT * FROM cloud_issued_numbers WHERE owner_id=?").bind(owner).all<{document_id:string}>()).results;
+  const customers=(await env.DB.prepare("SELECT id FROM cloud_customers WHERE owner_id=?").bind(owner).all<{id:string}>()).results;
+  const receipts=(await env.DB.prepare("SELECT response_snapshot FROM cloud_mutation_receipts WHERE owner_id=?").bind(owner).all<{response_snapshot:string}>()).results;
+  const feed=(await env.DB.prepare("SELECT * FROM cloud_record_feed WHERE owner_id=?").bind(owner).all<{id:string;sequence:number}>()).results;
+  expect(numbers).toHaveLength(1); expect(customers).toHaveLength(1); expect(receipts).toHaveLength(1); expect(feed).toHaveLength(1);
+  expect(customers[0].id).toBe(numbers[0].document_id); expect(feed[0].id).toBe(numbers[0].document_id);
+  expect(JSON.parse(receipts[0].response_snapshot)).toEqual({id:numbers[0].document_id,number:"1"});
+  expect(await env.DB.prepare("SELECT head_sequence FROM cloud_record_state WHERE owner_id=?").bind(owner).first("head_sequence")).toBe(feed[0].sequence);
+  expect(await env.DB.prepare("SELECT next_index FROM cloud_number_state WHERE owner_id=?").bind(owner).first("next_index")).toBe(2);
+  expect(await env.DB.prepare("SELECT generation FROM cloud_number_state WHERE owner_id=?").bind(owner).first("generation")).toBe(2);
+  expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM cloud_batch_guards").first("n")).toBe(0);
+});

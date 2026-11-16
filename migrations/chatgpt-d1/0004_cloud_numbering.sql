@@ -1,6 +1,6 @@
 -- Source-only numbering; verified import must seed state before readiness.
 CREATE TABLE cloud_number_state (
- owner_id TEXT PRIMARY KEY REFERENCES cloud_owners(owner_id),
+ owner_id TEXT PRIMARY KEY NOT NULL REFERENCES cloud_owners(owner_id),
  next_index INTEGER NOT NULL CHECK(typeof(next_index)='integer' AND next_index BETWEEN 1 AND 9007199254740991),
  generation INTEGER NOT NULL CHECK(typeof(generation)='integer' AND generation BETWEEN 1 AND 9007199254740991),
  prefix TEXT NOT NULL CHECK(length(CAST(prefix AS BLOB))<=64),
