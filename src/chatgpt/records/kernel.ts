@@ -69,14 +69,14 @@ export function createCloudRecordKernel(db: D1Database, dependencies: { authoriz
     async prepareAndCommit(a: CloudRecordAuthority, command: MutationCommand, prepare: () => Promise<(at: number) => MutationPlan>): Promise<JsonValue> {
       requireRecordAuthority(a, namespace);
       const hash = await commandHash(command);
-      await authorize(a, true);
       const existing = await receipt(a, command.operationKey);
+      await authorize(a, true);
       if (existing) return replay(existing, command.kind, hash);
       let build;
       try { build = await prepare(); }
       catch (error) {
-        await authorize(a, true);
         const winner = await receipt(a, command.operationKey);
+        await authorize(a, true);
         if (winner) return replay(winner, command.kind, hash);
         if (error instanceof RecordError) throw error;
         throw new RecordError("storage_unavailable");

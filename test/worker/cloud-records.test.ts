@@ -64,7 +64,7 @@ describe("owned business customer and explicit rates", () => {
     const { authority } = await setup(); const repo = repository();
     const saved = await repo.putBusinessProfile(authority, { operationKey: "business", expectedRevision: 0, value: business });
     expect(saved.id).toBe(authority.businessId);
-    expect(saved.value.tax).toEqual({ enabled: false, ratePercent: "0", label: "Sales tax" });
+    expect(saved.value.tax).toEqual({ enabled: false, ratePercent: "10", label: "Sales tax" });
     expect(await repo.getBusinessContext(authority)).toEqual(saved);
     await expect(repo.putBusinessProfile(authority, { operationKey: "stale", expectedRevision: 0, value: business })).rejects.toMatchObject({ code: "revision_conflict" });
   });
@@ -183,4 +183,82 @@ it("preserves unknown units and never creates a second business record", async (
   expect((await env.DB.prepare("SELECT * FROM cloud_business_profiles").all()).results).toHaveLength(1);
   const saved = await repo.putSavedRate(one.authority, { operationKey: "rate", expectedRevision: 0, id, explicitUserRequest: true, value: { ...rate, unit: null } });
   expect(saved.value.unit).toBeNull();
+});
+
+it("checks authority after reading an existing receipt", async () => {
+  const { authority } = await setup(); const repo = repository();
+  const command = { operationKey: "replay-revoke", expectedRevision: 0, id, value: customer };
+  await repo.createCustomer(authority, command);
+  const db = revokingReceiptDB(authority.ownerId);
+  const guarded = createCloudRecordRepository(db, { authorizationNamespace: namespace, now: () => start });
+  await expect(guarded.createCustomer(authority, command)).rejects.toMatchObject({ code: "not_authorized" });
+});
+it("normalizes omitted optional contacts detail and historical unit to null", async () => {
+  const { authority } = await setup(); const repo = repository();
+  const minimal = { name: customer.name, billingAddressLines: customer.billingAddressLines, savedJobSites: customer.savedJobSites };
+  const created = await repo.createCustomer(authority, { operationKey: "minimal", expectedRevision: 0, value: minimal });
+  expect(created.value).toMatchObject({ email: null, phone: null });
+  expect(await repo.createCustomer(authority, { operationKey: "minimal", expectedRevision: 0, value: { ...minimal, email: null, phone: null } })).toEqual(created);
+  const minimalRate = { title: rate.title, defaultQuantity: rate.defaultQuantity, unitPrice: rate.unitPrice, kind: rate.kind };
+  expect((await repo.putSavedRate(authority, { operationKey: "minimal-rate", id, expectedRevision: 0, explicitUserRequest: true, value: minimalRate })).value).toMatchObject({ detail: null, unit: null });
+});
+it("preserves configured tax while disabled", async () => {
+  const { authority } = await setup(); const repo = repository();
+  const disabled = await repo.putBusinessProfile(authority, { operationKey: "tax-off", expectedRevision: 0, value: business });
+  expect(disabled.value.tax).toEqual({ enabled: false, ratePercent: "10", label: "Sales tax" });
+  expect((await repo.putBusinessProfile(authority, { operationKey: "tax-on", expectedRevision: 1, value: { ...disabled.value, tax: { ...disabled.value.tax, enabled: true } } })).value.tax.ratePercent).toBe("10");
+  expect(await repo.putBusinessProfile(authority, { operationKey: "tax-off", expectedRevision: 0, value: business })).toEqual(disabled);
+});
+it.each(["Client\n", "\tClient", "Client\r"])("rejects raw single-line controls before trimming %#", async name => {
+  const { authority } = await setup();
+  await expect(repository().createCustomer(authority, { operationKey: "controls", expectedRevision: 0, value: { ...customer, name } })).rejects.toMatchObject({ code: "invalid_input" });
+});
+it.each(["+01:00", "-0530"])("rejects numeric-offset time zones %#", async timezone => {
+  const { authority } = await setup();
+  await expect(repository().putBusinessProfile(authority, { operationKey: "zone", expectedRevision: 0, value: { ...business, timezone } })).rejects.toMatchObject({ code: "invalid_input" });
+});
+
+function revokingReceiptDB(ownerId: string): D1Database {
+  return new Proxy(env.DB, { get(target, property) {
+    if (property === "withSession") return (...args: Parameters<D1Database["withSession"]>) => {
+      const session = target.withSession(...args);
+      return new Proxy(session, { get(sessionTarget, sessionProperty) {
+        if (sessionProperty === "prepare") return (sql: string) => {
+          const statement = sessionTarget.prepare(sql);
+          if (!sql.includes("SELECT kind,request_hash,response_snapshot")) return statement;
+          return new Proxy(statement, { get(statementTarget, statementProperty) {
+            if (statementProperty === "bind") return (...values: unknown[]) => {
+              const bound = statementTarget.bind(...values);
+              return new Proxy(bound, { get(boundTarget, boundProperty) {
+                if (boundProperty === "first") return async () => {
+                  const row = await boundTarget.first();
+                  if (row) await target.prepare("UPDATE cloud_connections SET status='revoked' WHERE owner_id=?").bind(ownerId).run();
+                  return row;
+                };
+                const value = Reflect.get(boundTarget, boundProperty, boundTarget);
+                return typeof value === "function" ? value.bind(boundTarget) : value;
+              } });
+            };
+            const value = Reflect.get(statementTarget, statementProperty, statementTarget);
+            return typeof value === "function" ? value.bind(statementTarget) : value;
+          } });
+        };
+        const value = Reflect.get(sessionTarget, sessionProperty, sessionTarget);
+        return typeof value === "function" ? value.bind(sessionTarget) : value;
+      } });
+    };
+    const value = Reflect.get(target, property, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  } });
+}
+
+it("checks authority after reading a failed-prepare winner receipt", async () => {
+  const { authority } = await setup();
+  const normal = createCloudRecordKernel(env.DB, { authorizationNamespace: namespace, now: () => start });
+  const guarded = createCloudRecordKernel(revokingReceiptDB(authority.ownerId), { authorizationNamespace: namespace, now: () => start });
+  const command = { operationKey: "late-winner", kind: "customer.create", request: {} };
+  await expect(guarded.prepareAndCommit(authority, command, async () => {
+    await normal.commit(authority, command, () => ({ condition: { sql: "1", values: [] }, statements: [], events: [{ kind: "customer", id: "id", revision: 1, payload: {}, tombstone: false }], response: { private: "snapshot" } }));
+    throw new Error("planning lost race");
+  })).rejects.toMatchObject({ code: "not_authorized" });
 });
