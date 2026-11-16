@@ -1,9 +1,34 @@
 import { beforeEach, expect, it } from "vitest";
-import { createCloudToolHandler } from "../../src/chatgpt/tools/transport.js";
+import { createCloudToolHandler, normalizeFiniteSSE } from "../../src/chatgpt/tools/transport.js";
 import { createStrictJSONParser, parseStrictJSON } from "../../src/chatgpt/json.js";
 import { env, namespace, reset, setup, start } from "./cloud-record-fixtures.js";
 
 beforeEach(reset);
+it("keeps valid parsed request IDs on early routing failures", async () => {
+  const { authority } = await setup();
+  const handler = createCloudToolHandler(env.DB, deps, authority);
+  for (const body of [
+    { jsonrpc: "2.0", id: 9, method: "initialize", params: { protocolVersion: 42 } },
+    { jsonrpc: "2.0", id: "request-9" },
+  ]) {
+    const response = await handler.fetch(request(JSON.stringify(body)));
+    expect(response.status).toBe(400);
+    expect(await decoded(response)).toEqual({ jsonrpc: "2.0", id: body.id, error: { code: -32600, message: "invalid_input" } });
+  }
+});
+it("uses the parse-error code without trusting an ID from malformed JSON", async () => {
+  const { authority } = await setup();
+  const malformed = await createCloudToolHandler(env.DB, deps, authority).fetch(request('{"jsonrpc":"2.0","id":9,'));
+  expect(await decoded(malformed)).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "invalid_input" } });
+});
+it("rejects a finite SSE response truncated before its event delimiter", async () => {
+  const event = 'event: message\ndata: {"jsonrpc":"2.0","id":9,"result":{}}';
+  const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(event)); controller.close(); } });
+  const text = await new Response(stream).text();
+  expect(() => normalizeFiniteSSE(text)).toThrow("invalid_response");
+  expect(normalizeFiniteSSE(`${event}\n\n`)).toBe(`${event}\n\n`);
+  expect(normalizeFiniteSSE(`${event.replaceAll("\n", "\r\n")}\r\n\r\n`)).toBe(`${event}\n\n`);
+});
 const deps = { authorizationNamespace: namespace, now: () => start };
 function request(body: string | Uint8Array, headers: Record<string, string> = {}) {
   return new Request("https://test.invalid/mcp", { method: "POST", body, headers: { "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-11-25", ...headers } });

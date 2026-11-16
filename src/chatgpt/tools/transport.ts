@@ -53,6 +53,21 @@ function cleanProtocolError(value: unknown) {
   const message = [-32700, -32600, -32601, -32602].includes(code) ? "invalid_input" : "storage_unavailable";
   return { jsonrpc: "2.0", id: correlationId(value), error: { code, message } };
 }
+/** Internal finite-response parser; never accept open-ended notification streams. */
+export function normalizeFiniteSSE(source: string): string {
+  const text = source.replaceAll("\r\n", "\n");
+  if (!text.endsWith("\n\n")) throw new Error("invalid_response");
+  let foundData = false;
+  const frames = text.split("\n\n").map(frame => {
+    const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
+    if (!data) return frame;
+    foundData = true;
+    const error = cleanProtocolError(JSON.parse(data));
+    return error ? `event: message\ndata: ${JSON.stringify(error)}` : frame;
+  });
+  if (!foundData) throw new Error("invalid_response");
+  return frames.join("\n\n");
+}
 
 /** Internal stateless facade. Public entries must use this, not the bare SDK handler. */
 export function createCloudToolTransport(factory: () => McpServer) {
@@ -73,7 +88,7 @@ export function createCloudToolTransport(factory: () => McpServer) {
       // protocol validator; reject invalid routing types before entering it.
       if (parsedBody.method === "initialize" && (!object(parsedBody.params) || typeof parsedBody.params.protocolVersion !== "string")) throw new BoundaryError(400, "invalid_input");
     } catch (error) {
-      return protocolError(error instanceof BoundaryError ? error.status : 400, null, "invalid_input");
+      return protocolError(error instanceof BoundaryError ? error.status : 400, correlationId(parsedBody), "invalid_input", error instanceof BoundaryError ? -32600 : -32700);
     }
     if (request.signal.aborted) return protocolError(499, correlationId(parsedBody), "invalid_input");
     try {
@@ -95,16 +110,7 @@ export function createCloudToolTransport(factory: () => McpServer) {
         return new Response(error ? JSON.stringify(error) : bytes, { status: response.status, headers });
       }
       if (contentType === "text/event-stream") {
-        let foundData = false;
-        const frames = text.replaceAll("\r\n", "\n").split("\n\n").map(frame => {
-          const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
-          if (!data) return frame;
-          foundData = true;
-          const error = cleanProtocolError(JSON.parse(data));
-          return error ? `event: message\ndata: ${JSON.stringify(error)}` : frame;
-        });
-        if (!foundData) throw new Error("invalid_response");
-        return new Response(frames.join("\n\n"), { status: response.status, headers });
+        return new Response(normalizeFiniteSSE(text), { status: response.status, headers });
       }
       throw new Error("invalid_response");
     } catch {
