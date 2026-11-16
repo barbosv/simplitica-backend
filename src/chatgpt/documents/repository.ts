@@ -94,7 +94,7 @@ export function createCloudDocumentRepository(db: D1Database, dependencies: { au
         const merged={...source(v),...(selection && selection.id!==v.customerId && !Object.hasOwn(changes,"jobSiteId") ? {jobSiteId:null}:{}),...changes};
         const next=buildDocumentPreview(merged,{id:a.businessId,revision:v.businessRevision,createdAt:0,updatedAt:0,deletedAt:null,value:v.businessSnapshot},customer);
         next.lines=next.lines.map(line=>({...line,id:line.id ?? crypto.randomUUID()}));
-        Object.assign(next,{number:v.number,state:v.state,requiresNativeReview:v.requiresNativeReview,createdBy:v.createdBy,convertedFrom:v.convertedFrom});
+        Object.assign(next,{number:v.number,state:v.state,requiresNativeReview:true,createdBy:v.createdBy,convertedFrom:v.convertedFrom});
         return at => {
           const record: VersionedRecord<DocumentValue>={id,revision:expectedRevision+1,createdAt:row.created_at,updatedAt:at,deletedAt:null,value:next};
           const c=documentCondition(a,id,expectedRevision,"draft");

@@ -258,3 +258,13 @@ it("requires native review on conversion from a reviewed finalized estimate", as
   expect(invoice.value).toMatchObject({state:"draft",requiresNativeReview:true,businessSnapshot:estimate.value.businessSnapshot,customerSnapshot:estimate.value.customerSnapshot,lines:estimate.value.lines,total:estimate.value.total});
   expect(await env.DB.prepare("SELECT * FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId,estimate.id).first()).toEqual(before);
 });
+it("requires fresh native review after editing a reviewed draft and replays the original response", async () => {
+  const f=await fixture(), draft=await f.repo.createDocument(f.authority,request("draft"));
+  await env.DB.prepare("UPDATE cloud_documents SET payload=json_set(payload,'$.requiresNativeReview',json('false')) WHERE owner_id=? AND id=?").bind(f.owner.ownerId,draft.id).run();
+  expect((await f.repo.getDocument(f.authority,draft.id)).value.requiresNativeReview).toBe(false);
+  const edit={operationKey:"edit-reviewed",id:draft.id,expectedRevision:1,patch:{title:"Changed"}};
+  const updated=await f.repo.updateDocument(f.authority,edit);
+  expect(updated).toMatchObject({revision:2,value:{title:"Changed",requiresNativeReview:true}});
+  await f.repo.updateDocument(f.authority,{operationKey:"edit-again",id:draft.id,expectedRevision:2,patch:{notes:"Later"}});
+  expect(await f.repo.updateDocument(f.authority,edit)).toEqual(updated);
+});
