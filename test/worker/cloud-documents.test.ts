@@ -225,3 +225,36 @@ it.each(["revision", "deletion"])("guards estimate conversion against %s after p
   expect(await raceSnapshot()).toEqual(afterMutation);
   expect(await env.DB.prepare("SELECT revision,deleted_at FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId, estimate.id).first()).toMatchObject(mutation === "revision" ? { revision: 2, deleted_at: null } : { revision: 1, deleted_at: start });
 });
+it("preserves a valid site when refreshing the same customer snapshot", async () => {
+  const f=await fixture(), site="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const siteValue={id:site,addressKind:"jobSite",displayAddress:"Original address"};
+  await f.records.updateCustomer(f.authority,{operationKey:"site",id:customerId,expectedRevision:1,value:{...customer,savedJobSites:[siteValue]}});
+  const draft=await f.repo.createDocument(f.authority,{...request("draft"),customerRevision:2,input:{...input,jobSiteId:site}});
+  await f.records.updateCustomer(f.authority,{operationKey:"refresh",id:customerId,expectedRevision:2,value:{...customer,name:"Refreshed",savedJobSites:[{...siteValue,displayAddress:"Updated address"}]}});
+  const updated=await f.repo.updateDocument(f.authority,{operationKey:"select-same",id:draft.id,expectedRevision:1,patch:{customerSelection:{id:customerId,expectedRevision:3}}});
+  expect(updated.value).toMatchObject({customerRevision:3,customerSnapshot:{name:"Refreshed"},jobSite:{id:site,displayAddress:"Updated address"}});
+});
+it("rejects refreshing the same customer when its selected site was removed", async () => {
+  const f=await fixture(), site="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  await f.records.updateCustomer(f.authority,{operationKey:"site",id:customerId,expectedRevision:1,value:{...customer,savedJobSites:[{id:site,addressKind:"jobSite",displayAddress:"Original address"}]}});
+  const draft=await f.repo.createDocument(f.authority,{...request("draft"),customerRevision:2,input:{...input,jobSiteId:site}});
+  await f.records.updateCustomer(f.authority,{operationKey:"remove-site",id:customerId,expectedRevision:2,value:customer});
+  await expect(f.repo.updateDocument(f.authority,{operationKey:"select-same",id:draft.id,expectedRevision:1,patch:{customerSelection:{id:customerId,expectedRevision:3}}})).rejects.toMatchObject({code:"invalid_input"});
+  expect(await f.repo.getDocument(f.authority,draft.id)).toEqual(draft);
+});
+it("reads lifecycle and document type from the authoritative columns", async () => {
+  const f=await fixture(), estimate=await f.repo.createDocument(f.authority,request("estimate","estimate"));
+  for (const state of ["finalized","sent","paid"]) {
+    await env.DB.prepare("UPDATE cloud_documents SET state=?,document_type='invoice' WHERE owner_id=? AND id=?").bind(state,f.owner.ownerId,estimate.id).run();
+    expect((await f.repo.getDocument(f.authority,estimate.id)).value).toMatchObject({state,documentType:"invoice"});
+    await expect(f.repo.updateDocument(f.authority,{operationKey:`edit-${state}`,id:estimate.id,expectedRevision:1,patch:{title:"Changed"}})).rejects.toMatchObject({code:"revision_conflict"});
+  }
+});
+it("requires native review on conversion from a reviewed finalized estimate", async () => {
+  const f=await fixture(), estimate=await f.repo.createDocument(f.authority,request("estimate","estimate"));
+  await env.DB.prepare("UPDATE cloud_documents SET state='finalized',payload=json_set(payload,'$.requiresNativeReview',json('false')) WHERE owner_id=? AND id=?").bind(f.owner.ownerId,estimate.id).run();
+  const before=await env.DB.prepare("SELECT * FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId,estimate.id).first();
+  const invoice=await f.repo.convertEstimateToInvoice(f.authority,{operationKey:"convert-reviewed",id:estimate.id,expectedRevision:1,issueDate:"2024-03-01",dueDate:null});
+  expect(invoice.value).toMatchObject({state:"draft",requiresNativeReview:true,businessSnapshot:estimate.value.businessSnapshot,customerSnapshot:estimate.value.customerSnapshot,lines:estimate.value.lines,total:estimate.value.total});
+  expect(await env.DB.prepare("SELECT * FROM cloud_documents WHERE owner_id=? AND id=?").bind(f.owner.ownerId,estimate.id).first()).toEqual(before);
+});

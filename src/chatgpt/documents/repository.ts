@@ -12,7 +12,7 @@ import type { DocumentValue } from "./types.js";
 type Row = { id: string; revision: number; created_at: number; updated_at: number; deleted_at: number | null; payload: string; state: DocumentValue["state"]; document_type: "invoice" | "estimate" };
 const json = (v: unknown): JsonValue => JSON.parse(encodeRecordJSON(v)) as JsonValue;
 const rowRecord = (r: Row): VersionedRecord<DocumentValue> => {
-  try { return { id: r.id, revision: r.revision, createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at, value: JSON.parse(r.payload) as DocumentValue }; }
+  try { return { id: r.id, revision: r.revision, createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at, value: { ...JSON.parse(r.payload) as DocumentValue, state: r.state, documentType: r.document_type } }; }
   catch { throw new RecordError("storage_unavailable"); }
 };
 const source = (v: DocumentValue) => ({ documentType: v.documentType, issueDate: v.issueDate, serviceDate: v.serviceDate, dueDate: v.dueDate, title: v.title, notes: v.notes, paymentTermsSummary: v.paymentTermsSummary, jobSiteId: v.jobSite?.id ?? null, lines: v.lines.map(({ id, title, detail, quantity, unitPrice, unit, kind, reportedProvenance }) => ({ ...(id === null ? {} : { id }), title, detail, quantity, unitPrice, unit, kind, reportedProvenance: { kind: reportedProvenance.kind, reference: reportedProvenance.reference, asOf: reportedProvenance.asOf } })), discountAmount: v.discountAmount });
@@ -91,7 +91,7 @@ export function createCloudDocumentRepository(db: D1Database, dependencies: { au
           try { customer={id:rows[0].id,revision:rows[0].revision,createdAt:rows[0].created_at,updatedAt:rows[0].updated_at,deletedAt:null,value:JSON.parse(rows[0].payload) as Customer}; } catch { throw new RecordError("storage_unavailable"); }
         }
         const { customerSelection: _selection, ...changes }=patch; void _selection;
-        const merged={...source(v),...(selection && !Object.hasOwn(changes,"jobSiteId") ? {jobSiteId:null}:{}),...changes};
+        const merged={...source(v),...(selection && selection.id!==v.customerId && !Object.hasOwn(changes,"jobSiteId") ? {jobSiteId:null}:{}),...changes};
         const next=buildDocumentPreview(merged,{id:a.businessId,revision:v.businessRevision,createdAt:0,updatedAt:0,deletedAt:null,value:v.businessSnapshot},customer);
         next.lines=next.lines.map(line=>({...line,id:line.id ?? crypto.randomUUID()}));
         Object.assign(next,{number:v.number,state:v.state,requiresNativeReview:v.requiresNativeReview,createdBy:v.createdBy,convertedFrom:v.convertedFrom});
@@ -113,7 +113,7 @@ export function createCloudDocumentRepository(db: D1Database, dependencies: { au
         const old=rowRecord(row).value; if (old.calculationVersion!=="usd-line-cents-v1" || old.createdBy!=="chatgpt") return invalid();
         const newId=crypto.randomUUID(), build=await planner.prepareServerAllocation(a.ownerId,newId);
         return at => {
-          const n=build(at), value:DocumentValue={...old,documentType:"invoice",state:"draft",number:n.number,issueDate:dates.issueDate,dueDate:dates.dueDate,convertedFrom:{id,revision:expectedRevision}};
+          const n=build(at), value:DocumentValue={...old,documentType:"invoice",state:"draft",number:n.number,requiresNativeReview:true,issueDate:dates.issueDate,dueDate:dates.dueDate,convertedFrom:{id,revision:expectedRevision}};
           const record: VersionedRecord<DocumentValue>={id:newId,revision:1,createdAt:at,updatedAt:at,deletedAt:null,value};
           return {condition:{sql:`(${n.condition.sql}) AND EXISTS(SELECT 1 FROM cloud_documents WHERE owner_id=? AND id=? AND revision=? AND document_type='estimate' AND deleted_at IS NULL) AND NOT EXISTS(SELECT 1 FROM cloud_estimate_conversions WHERE owner_id=? AND estimate_id=?)`,values:[...n.condition.values,a.ownerId,id,expectedRevision,a.ownerId,id]},statements:[...n.statements,insert(a,newId,value,at),db.prepare("INSERT INTO cloud_estimate_conversions(owner_id,estimate_id,invoice_id,estimate_revision,created_at) VALUES (?,?,?,?,?)").bind(a.ownerId,id,newId,expectedRevision,at)],events:[event(record)],response:json(record)};
         };
