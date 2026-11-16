@@ -3,6 +3,11 @@ import { encodeRecordJSON } from "../records/json.js";
 import { invalid, object, text, uuid } from "../records/validation.js";
 import type { NormalizedDocumentInput, NormalizedSourceLine, ReportedProvenance } from "./types.js";
 
+export function readReferenceRevision(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) return invalid();
+  return value;
+}
+
 const nullableText = (value: unknown, max: number) => value === null ? null : text(value, max, false, true) || null;
 function date(value: unknown): string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return invalid();

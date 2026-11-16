@@ -3,9 +3,9 @@ import { createCloudRecordKernel } from "../records/kernel.js";
 import { encodeRecordJSON } from "../records/json.js";
 import type { VersionedRecord } from "../records/repository.js";
 import { RecordError } from "../records/types.js";
-import { invalid, object, revision, uuid, type BusinessProfile, type Customer } from "../records/validation.js";
+import { invalid, object, uuid, type BusinessProfile, type Customer } from "../records/validation.js";
 import { calculateDocumentV1, CalculationError } from "./calculator.js";
-import { normalizeDocumentInput } from "./validation.js";
+import { normalizeDocumentInput, readReferenceRevision } from "./validation.js";
 import type { DocumentValue } from "./types.js";
 
 export function buildDocumentPreview(input: unknown, business: VersionedRecord<BusinessProfile>, customer: VersionedRecord<Customer>): DocumentValue {
@@ -26,7 +26,7 @@ export function createDocumentPreviewService(db: D1Database, dependencies: { aut
   return { async previewDocument(authority: CloudRecordAuthority, request: unknown): Promise<DocumentValue> {
     requireRecordAuthority(authority, dependencies.authorizationNamespace);
     const r = object(request, ["businessRevision", "customerId", "customerRevision", "input"]);
-    const businessRevision = revision(r.businessRevision), customerRevision = revision(r.customerRevision), customerId = uuid(r.customerId);
+    const businessRevision = readReferenceRevision(r.businessRevision), customerRevision = readReferenceRevision(r.customerRevision), customerId = uuid(r.customerId);
     const input = normalizeDocumentInput(r.input);
     const rows = await kernel.readAuthoring<Row>(authority, db.prepare(`SELECT b.id b_id,b.revision b_revision,b.created_at b_created,b.updated_at b_updated,b.payload b_payload,c.id c_id,c.revision c_revision,c.created_at c_created,c.updated_at c_updated,c.payload c_payload FROM cloud_business_profiles b JOIN cloud_customers c ON c.owner_id=b.owner_id WHERE b.owner_id=? AND b.id=? AND b.deleted_at IS NULL AND c.id=? AND c.deleted_at IS NULL`).bind(authority.ownerId, authority.businessId, customerId));
     const row = rows[0];

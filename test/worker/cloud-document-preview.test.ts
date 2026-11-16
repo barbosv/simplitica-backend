@@ -78,9 +78,23 @@ it("enforces current authority, owner, revisions and pure repeated previews", as
   await env.DB.prepare("UPDATE cloud_devices SET status='revoked' WHERE owner_id=?").bind(one.authority.ownerId).run();
   await expect(service.previewDocument(one.authority, request)).rejects.toMatchObject({ code: "not_authorized" });
 });
-it("rejects an oversized otherwise valid output", () => {
-  const huge = "x\n".repeat(1024);
-  expect(() => normalizeDocumentInput({ ...input, lines: Array.from({ length: 200 }, () => ({ ...line, detail: huge, reportedProvenance: { kind: "explicit", reference: huge, asOf: null } })) })).toThrow(expect.objectContaining({ code: "invalid_input" }));
+it("rejects an oversized preview built from valid bounded sources without writes", async () => {
+  const { authority } = await setup();
+  const repo = createCloudRecordRepository(env.DB, { authorizationNamespace: namespace, now: () => start });
+  const sites = Array.from({ length: 20 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, addressKind: "jobSite", displayAddress: "a".repeat(1024) }));
+  await repo.putBusinessProfile(authority, { operationKey: "business", expectedRevision: 0, value: { ...business, addressLines: Array(10).fill("b".repeat(1024)) } });
+  await repo.createCustomer(authority, { operationKey: "customer", expectedRevision: 0, id: customerId, value: { ...customer, savedJobSites: sites } });
+  const huge = "x\n".repeat(830);
+  const largeInput = { ...input, lines: Array.from({ length: 200 }, () => ({ ...line, detail: huge, reportedProvenance: { kind: "explicit", reference: huge, asOf: null } })) };
+  const canonical = normalizeDocumentInput(largeInput);
+  expect(new TextEncoder().encode(JSON.stringify(largeInput)).byteLength).toBeLessThan(1_048_576);
+  expect(new TextEncoder().encode(JSON.stringify(canonical)).byteLength).toBeLessThan(1_048_576);
+  const tables = ["cloud_documents", "cloud_estimate_conversions", "cloud_business_profiles", "cloud_customers", "cloud_saved_rates", "cloud_number_state", "cloud_number_reservations", "cloud_issued_numbers", "cloud_mutation_receipts", "cloud_record_feed", "cloud_record_state"];
+  const snapshot = async () => Promise.all(tables.map(async table => (await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
+  const before = await snapshot();
+  const service = createDocumentPreviewService(env.DB, { authorizationNamespace: namespace, now: () => start });
+  await expect(service.previewDocument(authority, { businessRevision: 1, customerId, customerRevision: 1, input: largeInput })).rejects.toMatchObject({ code: "invalid_input" });
+  expect(await snapshot()).toEqual(before);
 });
 it("normalizes source intent idempotently for receipt hashing", () => {
   const normalized = normalizeDocumentInput(input);
@@ -112,4 +126,14 @@ it("selects an owned postal site and rejects a deleted source", async () => {
   expect((await service.previewDocument(authority, request)).jobSite).toMatchObject({ id: customerId, addressKind: "shipTo", displayAddress: "123 Main" });
   await repo.deleteCustomer(authority, { operationKey: "delete", id: customerId, expectedRevision: 1 });
   await expect(service.previewDocument(authority, request)).rejects.toMatchObject({ code: "not_found" });
+});
+it("previews schema-valid maximum source revisions", async () => {
+  const { authority } = await setup();
+  const repo = createCloudRecordRepository(env.DB, { authorizationNamespace: namespace, now: () => start });
+  await repo.putBusinessProfile(authority, { operationKey: "business", expectedRevision: 0, value: business });
+  await repo.createCustomer(authority, { operationKey: "customer", expectedRevision: 0, id: customerId, value: customer });
+  await env.DB.prepare("UPDATE cloud_business_profiles SET revision=? WHERE owner_id=?").bind(Number.MAX_SAFE_INTEGER, authority.ownerId).run();
+  await env.DB.prepare("UPDATE cloud_customers SET revision=? WHERE owner_id=?").bind(Number.MAX_SAFE_INTEGER, authority.ownerId).run();
+  const service = createDocumentPreviewService(env.DB, { authorizationNamespace: namespace, now: () => start });
+  expect(await service.previewDocument(authority, { businessRevision: Number.MAX_SAFE_INTEGER, customerId, customerRevision: Number.MAX_SAFE_INTEGER, input })).toMatchObject({ businessRevision: Number.MAX_SAFE_INTEGER, customerRevision: Number.MAX_SAFE_INTEGER });
 });
