@@ -1,0 +1,9 @@
+# Native interpretation and unit-price presentation regressions
+
+The recovered main suite has11 remaining failing methods after the reviewed money-matching component. Repair the confirmed interpretation and USD-display defects without changing stored historical calculations, the cloud calculator, providers, auth, persistence or delivery. Full native health remains red until the other pricing/PDF/test-harness/UI failures are resolved separately.
+
+An explicit price-only total following an unpriced quantified task belongs to that task (5 hammers, $15 total => quantity5/unit3), not a second fabricated task. Keep distinct described/priced tasks distinct, retain existing for-price speech repair and last-price behavior, and never merge onto an already priced task. Recognition must require a real price and a price-only total tail, not arbitrary bare street/quantity numbers or prose containing total.
+
+Apple-first fallback output must meet the same raw validity rules as the primary output before normalization can manufacture a placeholder title. A blank/empty extraction fails with the existing user error rather than a priced generic line. Conservative copy polish may reorder the explicitly stated kitchen-sink leaking phrase and leading repair verb for estimate/invoice tone, preserving quantities, amounts and scope. Prompt instructions must require transcript-specific descriptions while avoiding the forbidden placeholder text itself; no weaker extraction assertions.
+
+USD unit-price display for en_US_POSIX uses the declared `$1,000.00` format without an inserted NBSP. Preserve Decimal value/rounding and non-USD behavior, and verify parse/display round trips for positive/zero/negative supported values. This is presentation, not an authoritative calculation change. Later connected six-fractional-digit unit editing must preserve raw precision rather than round-tripping a two-decimal display string on appearance.

@@ -1,0 +1,4961 @@
+{
+  "version": "usd-line-cents-v1",
+  "valid": [
+    {
+      "name": "required discount and tax",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "200",
+            "unitPrice": "4"
+          }
+        ],
+        "discountAmount": "50",
+        "taxRatePercent": "6"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "200",
+            "unitPrice": "4.00",
+            "lineTotal": "800.00"
+          }
+        ],
+        "subtotal": "800.00",
+        "discountRequested": "50.00",
+        "discountApplied": "50.00",
+        "taxRatePercent": "6",
+        "taxableAmount": "750.00",
+        "taxAmount": "45.00",
+        "total": "795.00"
+      }
+    },
+    {
+      "name": "three separately rounded lines",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          }
+        ],
+        "subtotal": "1.02",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "1.02",
+        "taxAmount": "0.00",
+        "total": "1.02"
+      }
+    },
+    {
+      "name": "half cent rounds up",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.5",
+            "unitPrice": "0.01"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.5",
+            "unitPrice": "0.01",
+            "lineTotal": "0.01"
+          }
+        ],
+        "subtotal": "0.01",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "0.01",
+        "taxAmount": "0.00",
+        "total": "0.01"
+      }
+    },
+    {
+      "name": "below half cent rounds down",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.333333",
+            "unitPrice": "0.015"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.333333",
+            "unitPrice": "0.015",
+            "lineTotal": "0.00"
+          }
+        ],
+        "subtotal": "0.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "0.00"
+      }
+    },
+    {
+      "name": "above half cent rounds up",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.333334",
+            "unitPrice": "0.015"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.333334",
+            "unitPrice": "0.015",
+            "lineTotal": "0.01"
+          }
+        ],
+        "subtotal": "0.01",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "0.01",
+        "taxAmount": "0.00",
+        "total": "0.01"
+      }
+    },
+    {
+      "name": "normalization equivalent forms",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "000200.000000",
+            "unitPrice": "0004.000000"
+          }
+        ],
+        "discountAmount": "00050.00",
+        "taxRatePercent": "0006.0000"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "200",
+            "unitPrice": "4.00",
+            "lineTotal": "800.00"
+          }
+        ],
+        "subtotal": "800.00",
+        "discountRequested": "50.00",
+        "discountApplied": "50.00",
+        "taxRatePercent": "6",
+        "taxableAmount": "750.00",
+        "taxAmount": "45.00",
+        "total": "795.00"
+      }
+    },
+    {
+      "name": "zero price and capped discount",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.250000",
+            "unitPrice": "000.000000"
+          }
+        ],
+        "discountAmount": "999999999999.99",
+        "taxRatePercent": "100.0000"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.25",
+            "unitPrice": "0.00",
+            "lineTotal": "0.00"
+          }
+        ],
+        "subtotal": "0.00",
+        "discountRequested": "999999999999.99",
+        "discountApplied": "0.00",
+        "taxRatePercent": "100",
+        "taxableAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "0.00"
+      }
+    },
+    {
+      "name": "discount capped at subtotal",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "2",
+            "unitPrice": "1.25"
+          }
+        ],
+        "discountAmount": "10",
+        "taxRatePercent": "99.9999"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "2",
+            "unitPrice": "1.25",
+            "lineTotal": "2.50"
+          }
+        ],
+        "subtotal": "2.50",
+        "discountRequested": "10.00",
+        "discountApplied": "2.50",
+        "taxRatePercent": "99.9999",
+        "taxableAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "0.00"
+      }
+    },
+    {
+      "name": "discount equals subtotal",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1",
+        "taxRatePercent": "1"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          }
+        ],
+        "subtotal": "1.00",
+        "discountRequested": "1.00",
+        "discountApplied": "1.00",
+        "taxRatePercent": "1",
+        "taxableAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "0.00"
+      }
+    },
+    {
+      "name": "tax half cent rounds up",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.05"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "10"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.05",
+            "lineTotal": "0.05"
+          }
+        ],
+        "subtotal": "0.05",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "10",
+        "taxableAmount": "0.05",
+        "taxAmount": "0.01",
+        "total": "0.06"
+      }
+    },
+    {
+      "name": "tax below half cent rounds down",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.05"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "9.9999"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.05",
+            "lineTotal": "0.05"
+          }
+        ],
+        "subtotal": "0.05",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "9.9999",
+        "taxableAmount": "0.05",
+        "taxAmount": "0.00",
+        "total": "0.05"
+      }
+    },
+    {
+      "name": "discount applied before tax",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.06"
+          }
+        ],
+        "discountAmount": "0.01",
+        "taxRatePercent": "10"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.06",
+            "lineTotal": "0.06"
+          }
+        ],
+        "subtotal": "0.06",
+        "discountRequested": "0.01",
+        "discountApplied": "0.01",
+        "taxRatePercent": "10",
+        "taxableAmount": "0.05",
+        "taxAmount": "0.01",
+        "total": "0.06"
+      }
+    },
+    {
+      "name": "maximum fractional scales and significant quantity",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999.999999",
+            "unitPrice": "0.000001"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999.999999",
+            "unitPrice": "0.000001",
+            "lineTotal": "1000.00"
+          }
+        ],
+        "subtotal": "1000.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "1000.00",
+        "taxAmount": "0.00",
+        "total": "1000.00"
+      }
+    },
+    {
+      "name": "large exact scaled multiplication",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999.999999",
+            "unitPrice": "999.999999"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999.999999",
+            "unitPrice": "999.999999",
+            "lineTotal": "999999999000.00"
+          }
+        ],
+        "subtotal": "999999999000.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "999999999000.00",
+        "taxAmount": "0.00",
+        "total": "999999999000.00"
+      }
+    },
+    {
+      "name": "maximum price scale below cent tie",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.999994"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.999994",
+            "lineTotal": "999999999999.99"
+          }
+        ],
+        "subtotal": "999999999999.99",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "999999999999.99",
+        "taxAmount": "0.00",
+        "total": "999999999999.99"
+      }
+    },
+    {
+      "name": "maximum authoritative cents",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.99999"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.99999",
+            "lineTotal": "999999999999.99"
+          }
+        ],
+        "subtotal": "999999999999.99",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "999999999999.99",
+        "taxAmount": "0.00",
+        "total": "999999999999.99"
+      }
+    },
+    {
+      "name": "maximum subtotal from multiple lines",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999",
+            "unitPrice": "1000"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "999.99"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999",
+            "unitPrice": "1000.00",
+            "lineTotal": "999999999000.00"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "999.99",
+            "lineTotal": "999.99"
+          }
+        ],
+        "subtotal": "999999999999.99",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "999999999999.99",
+        "taxAmount": "0.00",
+        "total": "999999999999.99"
+      }
+    },
+    {
+      "name": "large tax intermediate and total below cap",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "500000000"
+          }
+        ],
+        "discountAmount": "0.01",
+        "taxRatePercent": "100"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "500000000.00",
+            "lineTotal": "500000000000.00"
+          }
+        ],
+        "subtotal": "500000000000.00",
+        "discountRequested": "0.01",
+        "discountApplied": "0.01",
+        "taxRatePercent": "100",
+        "taxableAmount": "499999999999.99",
+        "taxAmount": "499999999999.99",
+        "total": "999999999999.98"
+      }
+    },
+    {
+      "name": "maximum tax precision",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "100"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0.0001"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "100.00",
+            "lineTotal": "100.00"
+          }
+        ],
+        "subtotal": "100.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0.0001",
+        "taxableAmount": "100.00",
+        "taxAmount": "0.00",
+        "total": "100.00"
+      }
+    },
+    {
+      "name": "minimum positive quantity",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.000001",
+            "unitPrice": "0.01"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.000001",
+            "unitPrice": "0.01",
+            "lineTotal": "0.00"
+          }
+        ],
+        "subtotal": "0.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "0.00"
+      }
+    },
+    {
+      "name": "unit price minimal two places",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.010000",
+            "unitPrice": "1.200000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.01",
+            "unitPrice": "1.20",
+            "lineTotal": "1.21"
+          }
+        ],
+        "subtotal": "1.21",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "1.21",
+        "taxAmount": "0.00",
+        "total": "1.21"
+      }
+    },
+    {
+      "name": "32 character leading zeros do not count as integer digits",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "00000000000000000000000000000001",
+            "unitPrice": "00000000000000000000000000000001"
+          }
+        ],
+        "discountAmount": "00000000000000000000000000000000",
+        "taxRatePercent": "00000000000000000000000000000100"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.00",
+            "lineTotal": "1.00"
+          }
+        ],
+        "subtotal": "1.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "100",
+        "taxableAmount": "1.00",
+        "taxAmount": "1.00",
+        "total": "2.00"
+      }
+    },
+    {
+      "name": "maximum 200 ordered lines",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "expected": {
+        "calculationVersion": "usd-line-cents-v1",
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0.335",
+            "lineTotal": "0.34"
+          }
+        ],
+        "subtotal": "68.00",
+        "discountRequested": "0.00",
+        "discountApplied": "0.00",
+        "taxRatePercent": "0",
+        "taxableAmount": "68.00",
+        "taxAmount": "0.00",
+        "total": "68.00"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "quantity empty",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity sign",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "+1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity negative zero",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "-0",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": " 1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity trailing space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1 ",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity newline",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1\n",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity exponent",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1e1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity separator",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1,000",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity unicode",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "\uff11",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity arabic digits",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "\u0661",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity leading dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": ".1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity trailing dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity multiple dots",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.0.0",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity number",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": 1,
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity null",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": null,
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity boolean",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": true,
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity array",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": [],
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity object",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": {},
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice empty",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": ""
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice sign",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "+1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice negative zero",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "-0"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": " 1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice trailing space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1 "
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice newline",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1\n"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice exponent",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1e1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice separator",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1,000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice unicode",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "\uff11"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice arabic digits",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "\u0661"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice leading dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": ".1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice trailing dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1."
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice multiple dots",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.0.0"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice number",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": 1
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice null",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": null
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice boolean",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": true
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice array",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": []
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice object",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": {}
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount empty",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount sign",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "+1",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount negative zero",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "-0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": " 1",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount trailing space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1 ",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount newline",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1\n",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount exponent",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1e1",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount separator",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1,000",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount unicode",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "\uff11",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount arabic digits",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "\u0661",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount leading dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": ".1",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount trailing dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1.",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount multiple dots",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1.0.0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount number",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": 1,
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount null",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": null,
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount boolean",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": true,
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount array",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": [],
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount object",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": {},
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent empty",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": ""
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent sign",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "+1"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent negative zero",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "-0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": " 1"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent trailing space",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1 "
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent newline",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1\n"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent exponent",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1e1"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent separator",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1,000"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent unicode",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "\uff11"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent arabic digits",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "\u0661"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent leading dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": ".1"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent trailing dot",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1."
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent multiple dots",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "1.0.0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent number",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": 1
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent null",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": null
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent boolean",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": true
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent array",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": []
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent object",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": {}
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity rejects bound 0",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity rejects bound 0.000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "0.000000",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity rejects bound 1000000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000000000",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity rejects bound 1.0000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1.0000000",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice rejects bound 1000000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1000000000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice rejects bound 1.0000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1.0000000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount rejects bound 1000000000000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "1000000000000",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount rejects bound 0.000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0.000",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent rejects bound 100.0001",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "100.0001"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent rejects bound 0.00000",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0.00000"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "quantity rejects 33 characters",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "000000000000000000000000000000001",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "unitPrice rejects 33 characters",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "000000000000000000000000000000001"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "discountAmount rejects 33 characters",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "000000000000000000000000000000001",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "taxRatePercent rejects 33 characters",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "000000000000000000000000000000001"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing currency",
+      "input": {
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing lines",
+      "input": {
+        "currency": "USD",
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing discountAmount",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing taxRatePercent",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing line quantity",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "missing line unitPrice",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "null root",
+      "input": null,
+      "error": "invalid_input"
+    },
+    {
+      "name": "array root",
+      "input": [],
+      "error": "invalid_input"
+    },
+    {
+      "name": "string root",
+      "input": "USD",
+      "error": "invalid_input"
+    },
+    {
+      "name": "wrong currency",
+      "input": {
+        "currency": "EUR",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "empty lines",
+      "input": {
+        "currency": "USD",
+        "lines": [],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "201 lines",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "0"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "null line",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          null
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "array line",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          []
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "extra caller total",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0",
+        "total": "1.00"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "extra metadata",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0",
+        "ownerId": "owner"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "extra line field",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1",
+            "unitPrice": "1",
+            "lineTotal": "1.00"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "nonarray lines",
+      "input": {
+        "currency": "USD",
+        "lines": {},
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "invalid_input"
+    },
+    {
+      "name": "line rounding crosses cap",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.999995"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "amount_out_of_range"
+    },
+    {
+      "name": "huge product above safe integer range",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999.999999",
+            "unitPrice": "999999999.999999"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "amount_out_of_range"
+    },
+    {
+      "name": "subtotal one cent above cap",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999",
+            "unitPrice": "1000"
+          },
+          {
+            "quantity": "1",
+            "unitPrice": "1000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0"
+      },
+      "error": "amount_out_of_range"
+    },
+    {
+      "name": "subtotal overflow cannot be hidden by discount",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "999999999",
+            "unitPrice": "999999999"
+          }
+        ],
+        "discountAmount": "999999999999.99",
+        "taxRatePercent": "0"
+      },
+      "error": "amount_out_of_range"
+    },
+    {
+      "name": "total one cent above cap",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "500000000"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "100"
+      },
+      "error": "amount_out_of_range"
+    },
+    {
+      "name": "total overflow with minimal positive rate",
+      "input": {
+        "currency": "USD",
+        "lines": [
+          {
+            "quantity": "1000",
+            "unitPrice": "999999999.99999"
+          }
+        ],
+        "discountAmount": "0",
+        "taxRatePercent": "0.0001"
+      },
+      "error": "amount_out_of_range"
+    }
+  ]
+}

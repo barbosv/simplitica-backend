@@ -4,6 +4,16 @@ Cloudflare Workers + D1 implementation: see [cutover and local development](docs
 
 Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Apple subscription sync**, **Stripe Connect** invoice payments, and **SimpliList Publix BOGO deals proxy**.
 
+## Development ChatGPT MCP probe
+
+A separate authenticated Worker exposes one synthetic read-only qualification tool, with no database binding or production routes. See the [OAuth qualification runbook](docs/chatgpt-managed-oauth-qualification.md) for development settings, local commands, staging/linking prerequisites and remaining live evidence. The probe is a replacement for the unavailable historical local implementation; it does not create invoices, enroll owners, or complete live OAuth qualification by itself.
+
+## Shared invoice calculation
+
+The isolated `usd-line-cents-v1` calculator uses decimal-string USD inputs and exact line-cent arithmetic; see the [calculation contract](docs/superpowers/specs/2026-11-15-invoice-calculation.md). For untrusted raw JSON call `calculateDocumentJSONV1(bytes)` from `src/chatgpt/documents/calculator.ts`. Its reusable `parseStrictJSON` helper enforces 64 KiB, depth 16, strict UTF-8/JSON, BOM rejection and duplicate-name rejection after escape decoding. Names compare as exact Unicode scalar sequences within each object, without normalization. The raw calculator maps parser failures to `invalid_input`; arithmetic overflow remains `amount_out_of_range`.
+
+Future Worker/MCP ingress must run the raw helper **before** SDK/JSON object parsing, request hashing or persistence. `calculateDocumentV1(input)` accepts already unambiguous objects and cannot recover discarded duplicate names. Shared raw-string fixtures complement the unchanged 133 numeric fixtures. This package adds no public authoring route or native app wiring.
+
 ## Features
 
 - `GET /health`, `GET /health/ready`
@@ -16,7 +26,7 @@ Shared backend for **Simpli Invoice**, **SimpliList**, and future iOS apps: **Ap
 - **SimpliList** (when `SIMPLILIST_BACKEND_API_KEY` is set):
   - `GET /v1/deals/publix/stores`, `GET /v1/deals/publix/bogo`
 
-Persistence: **PostgreSQL** (production) or **file** (`STORAGE_BACKEND=file` for local subscription-only dev).
+Persistence: **D1** for the Cloudflare Worker. The retained legacy Node server supports PostgreSQL or file storage for comparison; new ChatGPT integration work targets Workers/D1.
 
 ### Pricing environment variables
 

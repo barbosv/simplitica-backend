@@ -1,0 +1,144 @@
+{
+  "node-app-attest@2.2.0": {
+    "dist": {
+      "shasum": "75da284fe9f69c17e055bd594685271568366c7f",
+      "tarball": "https://registry.npmjs.org/node-app-attest/-/node-app-attest-2.2.0.tgz",
+      "integrity": "sha512-tgg0Asa74NrFU+S1kfX72UjuS2eLx3DpLpM+FPaopsVZntGeZXdDnyC1WE5mXAWfOUSJ3br4gZqQV3wBMI+w9Q==",
+      "fileCount": 12,
+      "unpackedSize": 43166,
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/node-app-attest@2.2.0",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "signatures": [
+        {
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+          "sig": "MEUCIA/ekr/BcONI7/1GSlYBOA6quveHBORuG/Ldg0yOtbIRAiEAhsx9dodhtrC7LPtCQrmNN7fGck+PGvKOu4cn/szN5ks="
+        }
+      ]
+    },
+    "license": "MIT",
+    "gitHead": "7f20c1cf577d0ffaff4ec71406e99c902f94f2bf",
+    "repository": {
+      "url": "git+https://github.com/uebelack/node-app-attest.git",
+      "type": "git"
+    },
+    "engines": {
+      "node": ">=24.0.0"
+    }
+  },
+  "cbor2@2.4.2": {
+    "dist": {
+      "shasum": "0283ba6156342cc0b7aab2c000ccd2b84b478ac8",
+      "tarball": "https://registry.npmjs.org/cbor2/-/cbor2-2.4.2.tgz",
+      "integrity": "sha512-fuz4FXnURAEvtFA8rS+3R85eSZAKZRL4vI9AU6eokOE1TghPsp7WZSh+VvB/3ltKaWZreWtjR/kahn/ogmsgsQ==",
+      "fileCount": 39,
+      "unpackedSize": 199704,
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/cbor2@2.4.2",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "signatures": [
+        {
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+          "sig": "MEUCIFLUImJeQM6a6HDXXoW25jasvyG5m/wTtqDGZy2Tu3j0AiEAll1vfAngN2vsl1USdFn5GobASG9gPKRT0ngR7ESPJ+0="
+        }
+      ]
+    },
+    "license": "MIT",
+    "gitHead": "537fae975f9d4386dfa5dddb5c94952310078248",
+    "repository": {
+      "url": "git+ssh://git@github.com/hildjj/cbor2.git",
+      "type": "git"
+    },
+    "engines": {
+      "node": ">=22"
+    }
+  },
+  "pkijs@4.0.1": {
+    "dist": {
+      "shasum": "1df7a5c3ae2505ed6a704bdf4564c23150e921ee",
+      "tarball": "https://registry.npmjs.org/pkijs/-/pkijs-4.0.1.tgz",
+      "fileCount": 5,
+      "integrity": "sha512-hs6jHBg+Y9ZZ9r5w2CHnKXkGPOr3qWfkLfnZGlbNkP2hceGZ6EgjnTS7tqwbugHXx5mCqoSf4TUH2nu1diirnA==",
+      "signatures": [
+        {
+          "sig": "MEYCIQDXTO/CqySqayY6UnnT/oY9Er32TvZnbGmyyGy6iXnBBgIhAJf29Ktwg/2BlGAWG7tMfcqG7q/Ef+v7uMAJh+QDLmza",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+          "sig": "MEUCIQD7Qe1xebkAskzx5PodPZoCHRcJ/XFpmYfysSfEbB0vCwIgHYjoVoG5A/FQq6iFUxmZOnlyByphDjB5Yuo2jyK9ZM0="
+        }
+      ],
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/pkijs@4.0.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "unpackedSize": 925686
+    },
+    "license": "BSD-3-Clause",
+    "gitHead": "c6ed8d11a34d0e6ff9fb0b3092be530b5e1100f4",
+    "repository": {
+      "url": "git+https://github.com/PeculiarVentures/PKI.js.git",
+      "type": "git"
+    },
+    "engines": {
+      "node": "^20.19.0 || >=22.12.0"
+    }
+  },
+  "asn1js@4.0.0": {
+    "dist": {
+      "shasum": "ffc8bf1e85378e868b39a7878b18c6f71119cdff",
+      "tarball": "https://registry.npmjs.org/asn1js/-/asn1js-4.0.0.tgz",
+      "fileCount": 5,
+      "integrity": "sha512-81NlooYbXCbBWL2+p1/ivGyT4AR2+bnfKYlPq/3rCoIPJSuLbdS8G70XYt561wOJnbaYfBS2HQDMENaX5hM2vA==",
+      "signatures": [
+        {
+          "sig": "MEUCIEHeF3KqXNHUPEH33JrKyRpDmTCzh05gqYxT0joOKGytAiEA9It/0f4OV+h4QeuiHcsM537FtqoRmg4htAqhdBGNcvw=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+          "sig": "MEUCIQD5jsgU5RpBVERz8O9cEDaKzfahcvja06bpkoUwdFPcgwIgCvjxL9Evzs8p4gEWRSYvHV7tfjA0f8bL5H0Clq8IR0A="
+        }
+      ],
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/asn1js@4.0.0",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "unpackedSize": 179415
+    },
+    "license": "BSD-3-Clause",
+    "gitHead": "029442f6ce2b1e6b80b7ac796c3e0793fbd96bb5",
+    "repository": {
+      "url": "git+https://github.com/PeculiarVentures/ASN1.js.git",
+      "type": "git"
+    },
+    "engines": {
+      "node": "^20.19.0 || >=22.12.0"
+    }
+  },
+  "fixtureSha256": {
+    "attestation-extensions.json": "9db81ad71e0d6eaa6faa02ae3437ad7cdc49acc7379ca259ff8829f31f40f724",
+    "attestation-development.json": "77950c2323211d3518b32fd5ed1f3bf88b62df6a24e06ba11626e11341fd8fac",
+    "attestation-production.json": "ee3fc12282522ac8531ab234e7a9465a0d74f23c6d3ae83c2225cf9642dbab35"
+  },
+  "upstreamFixtureTag": {
+    "repository": "https://github.com/uebelack/node-app-attest",
+    "tag": "v2.2.0",
+    "commit": "7f20c1cf577d0ffaff4ec71406e99c902f94f2bf"
+  },
+  "appleRoot": {
+    "source": "https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem",
+    "derSha256": "1cb9823ba28ba6ad2d33a006941de2ae4f513ef1d4e831b9f7e0fa7b6242c932"
+  }
+}
